@@ -2,7 +2,7 @@
 from thrifty.algos.thriftydagger import thrifty, generate_offline_data
 from thrifty.algos.lazydagger import lazy
 from thrifty.utils.run_utils import setup_logger_kwargs
-import gymnasium as gym
+import gymnasium
 import torch
 import robosuite as suite
 from robosuite.controllers import load_composite_controller_config
@@ -15,7 +15,7 @@ import numpy as np
 import sys
 import time
 
-class CustomWrapper(gym.Env):
+class CustomWrapper(gymnasium.Env):
 
 	def __init__(self, env, render):
 		self.env = env
@@ -32,7 +32,8 @@ class CustomWrapper(gym.Env):
 		settle_action = np.zeros(7)
 		settle_action[-1] = -1
 		for _ in range(10):
-			r, r2, r3, r4 = self.env.step(settle_action)
+			r = self.env.step(settle_action)
+			print(r)
 			self.render()
 		self.gripper_closed = False
 		return r
@@ -145,7 +146,8 @@ if __name__ == '__main__':
 	env = GymWrapper(env)
 	env = VisualizationWrapper(env, indicator_configs=None)
 	env = CustomWrapper(env, render=render)
-	print(env.observation_space)
+
+
 
 	arm_ = 'right'
 	config_ = 'single-arm-opposed'
@@ -174,10 +176,10 @@ if __name__ == '__main__':
 		a = np.zeros(7)
 		if env.gripper_closed:
 			a[-1] = 1.
-			input_device.grasp = True
+			input_device.grasp = True		# TODO: find how to alter input_device.grasp to newer robosuite
 		else:
 			a[-1] = -1.
-			input_device.grasp = False
+			input_device.grasp = False 		# TODO: find how to alter input_device.grasp to newer robosuite
 		a_ref = a.copy()
 		# pause simulation if there is no user input (instead of recording a no-op)
 		while np.array_equal(a, a_ref):

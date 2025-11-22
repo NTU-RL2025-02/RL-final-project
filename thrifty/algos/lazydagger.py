@@ -3,7 +3,6 @@ import itertools
 import numpy as np
 import torch
 from torch.optim import Adam
-import gym
 import time
 import thrifty.algos.core as core
 from thrifty.utils.logx import EpochLogger
