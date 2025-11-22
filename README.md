@@ -7,7 +7,7 @@ git clone https://github.com/NTU-RL2025-02/RL-final-project
 cd RL-final-project
 git clone https://github.com/NTU-RL2025-02/thriftydagger
 cd thriftydagger
-conda create -n thrifty-dagger py=3.10
+conda create -n thrifty-dagger python=3.10
 conda activate thrifty-dagger
 pip install -e .
 ```
