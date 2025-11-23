@@ -37,6 +37,7 @@ python robomimic/scripts/train.py --config robomimic/exps/paper/core/square/ph/l
 ### Thrifty DAgger
 to run (still fixing)
 ```sh
+# move the model trained from robomimic to scripts/expert_model first
 python scripts/run_thriftydagger.py test --no_render
 ```
 and you will see numpy broadcast mismatch (51, )->(61, ) error
