@@ -10,10 +10,12 @@ import pickle
 import os
 import sys
 
+
 class ReplayBuffer:
     """
     A simple FIFO experience replay buffer.
     """
+
     def __init__(self, obs_dim, act_dim, size, device):
         self.obs_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
         self.act_buf = np.zeros(core.combined_shape(size, act_dim), dtype=np.float32)
@@ -23,46 +25,62 @@ class ReplayBuffer:
     def store(self, obs, act):
         self.obs_buf[self.ptr] = obs
         self.act_buf[self.ptr] = act
-        self.ptr = (self.ptr+1) % self.max_size
-        self.size = min(self.size+1, self.max_size)
+        self.ptr = (self.ptr + 1) % self.max_size
+        self.size = min(self.size + 1, self.max_size)
 
     def sample_batch(self, batch_size=32):
         idxs = np.random.randint(0, self.size, size=batch_size)
-        batch = dict(obs=self.obs_buf[idxs],
-                act=self.act_buf[idxs])
-        return {k: torch.as_tensor(v, dtype=torch.float32, device=self.device) for k,v in batch.items()}
+        batch = dict(obs=self.obs_buf[idxs], act=self.act_buf[idxs])
+        return {
+            k: torch.as_tensor(v, dtype=torch.float32, device=self.device)
+            for k, v in batch.items()
+        }
 
     def fill_buffer(self, obs, act):
         for i in range(len(obs)):
             self.store(obs[i], act[i])
 
     def save_buffer(self):
-        pickle.dump({'obs_buf': self.obs_buf, 'act_buf': self.act_buf,
-            'ptr': self.ptr, 'size': self.size}, open('replay_buffer.pkl', 'wb'))
-        print('buf size', self.size)
+        pickle.dump(
+            {
+                "obs_buf": self.obs_buf,
+                "act_buf": self.act_buf,
+                "ptr": self.ptr,
+                "size": self.size,
+            },
+            open("replay_buffer.pkl", "wb"),
+        )
+        print("buf size", self.size)
 
     def load_buffer(self):
-        p = pickle.load(open('replay_buffer.pkl', 'rb'))
-        self.obs_buf = p['obs_buf']
-        self.act_buf = p['act_buf']
-        self.ptr = p['ptr']
-        self.size = p['size']
+        p = pickle.load(open("replay_buffer.pkl", "rb"))
+        self.obs_buf = p["obs_buf"]
+        self.act_buf = p["act_buf"]
+        self.ptr = p["ptr"]
+        self.size = p["size"]
 
     def clear(self):
         self.ptr, self.size = 0, 0
 
-def generate_offline_data(env, expert_policy, num_episodes=0, output_file='data.pkl', 
-    robosuite=False, robosuite_cfg=None):
+
+def generate_offline_data(
+    env,
+    expert_policy,
+    num_episodes=0,
+    output_file="data.pkl",
+    robosuite=False,
+    robosuite_cfg=None,
+):
     # Runs expert policy in the environment to collect data
     i = 0
     obs, act, rew = [], [], []
     act_limit = env.action_space.high[0]
     while i < num_episodes:
-        print('Episode #{}'.format(i))
+        print("Episode #{}".format(i))
         o, total_ret, d, t = env.reset(), 0, False, 0
         curr_obs, curr_act = [], []
         if robosuite:
-            robosuite_cfg['INPUT_DEVICE'].start_control()
+            robosuite_cfg["INPUT_DEVICE"].start_control()
         while not d:
             a = expert_policy(o)
             if a is None:
@@ -73,12 +91,14 @@ def generate_offline_data(env, expert_policy, num_episodes=0, output_file='data.
             curr_act.append(a)
             o, r, d, _ = env.step(a)
             if robosuite:
-                d = (t >= robosuite_cfg['MAX_EP_LEN']) or env._check_success()
+                d = (t >= robosuite_cfg["MAX_EP_LEN"]) or env._check_success()
                 r = int(env._check_success())
             total_ret += r
             t += 1
         if robosuite:
-            if total_ret > 0: # only count successful episodes for offline data collection
+            if (
+                total_ret > 0
+            ):  # only count successful episodes for offline data collection
                 i += 1
                 obs.extend(curr_obs)
                 act.extend(curr_act)
@@ -90,15 +110,33 @@ def generate_offline_data(env, expert_policy, num_episodes=0, output_file='data.
         print("Collected episode with return {}".format(total_ret))
         rew.append(total_ret)
     print("Ep Mean, Std Dev:", np.array(rew).mean(), np.array(rew).std())
-    pickle.dump({'obs': np.stack(obs), 'act': np.stack(act)}, open(output_file, 'wb'))
+    pickle.dump({"obs": np.stack(obs), "act": np.stack(act)}, open(output_file, "wb"))
 
 
-def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(), 
-    seed=0, grad_steps=500, obs_per_iter=2000, replay_size=int(3e4), pi_lr=1e-3, pi_safe_lr=1e-3,
-    batch_size=100, logger_kwargs=dict(), num_test_episodes=0, bc_epochs=5, noise=0.,
-    input_file='data.pkl', device_idx=0, expert_policy=None,
-    robosuite=False, robosuite_cfg=None, 
-    tau_sup=0.008, tau_auto=0.25):
+def lazy(
+    env,
+    iters=10,
+    actor_critic=core.MLP,
+    ac_kwargs=dict(),
+    seed=0,
+    grad_steps=500,
+    obs_per_iter=2000,
+    replay_size=int(3e4),
+    pi_lr=1e-3,
+    pi_safe_lr=1e-3,
+    batch_size=100,
+    logger_kwargs=dict(),
+    num_test_episodes=0,
+    bc_epochs=5,
+    noise=0.0,
+    input_file="data.pkl",
+    device_idx=0,
+    expert_policy=None,
+    robosuite=False,
+    robosuite_cfg=None,
+    tau_sup=0.008,
+    tau_auto=0.25,
+):
     """
     input_file: where initial BC data is stored
     robosuite: whether to enable robosuite specific code (and use robosuite_cfg)
@@ -107,7 +145,7 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
     """
     logger = EpochLogger(**logger_kwargs)
     _locals = locals()
-    del _locals['env']
+    del _locals["env"]
     logger.save_config(_locals)
     if device_idx >= 0:
         device = torch.device("cuda", device_idx)
@@ -119,41 +157,57 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
 
     obs_dim = env.observation_space.shape
     act_dim = env.action_space.shape[0]
-    act_limit = env.action_space.high[0] 
+    act_limit = env.action_space.high[0]
     assert act_limit == -1 * env.action_space.low[0], "Action space should be symmetric"
-    safety_threshold = tau_sup * sum((env.action_space.high - env.action_space.low) ** 2)
+    safety_threshold = tau_sup * sum(
+        (env.action_space.high - env.action_space.low) ** 2
+    )
     cov = noise * act_limit * np.eye(act_dim)
 
     # initialize actor and classifier NN
     ac = actor_critic(env.observation_space, env.action_space, device, **ac_kwargs)
 
     if num_test_episodes > 0:
-        ac = torch.load('model.pth', map_location=device)
+        ac = torch.load("model.pth", map_location=device)
         test_agent()
 
     # Experience buffer
-    replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device)
-    input_data = pickle.load(open(input_file, 'rb'))
+    replay_buffer = ReplayBuffer(
+        obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
+    )
+    input_data = pickle.load(open(input_file, "rb"))
     # set aside Dsafe
-    safe_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device)
-    num_bc = len(input_data['obs'])
+    safe_buffer = ReplayBuffer(
+        obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
+    )
+    num_bc = len(input_data["obs"])
     idxs = np.arange(num_bc)
     np.random.shuffle(idxs)
-    replay_buffer.fill_buffer(input_data['obs'][idxs][:int(0.7*num_bc)], input_data['act'][idxs][:int(0.7*num_bc)])
-    safe_buffer.fill_buffer(input_data['obs'], input_data['act'])
-    held_out_data = {'obs': input_data['obs'][idxs][int(0.7*num_bc):], 'act': input_data['act'][idxs][int(0.7*num_bc):]}
+    replay_buffer.fill_buffer(
+        input_data["obs"][idxs][: int(0.7 * num_bc)],
+        input_data["act"][idxs][: int(0.7 * num_bc)],
+    )
+    safe_buffer.fill_buffer(input_data["obs"], input_data["act"])
+    held_out_data = {
+        "obs": input_data["obs"][idxs][int(0.7 * num_bc) :],
+        "act": input_data["act"][idxs][int(0.7 * num_bc) :],
+    }
 
     # Set up function for computing actor loss
     def compute_loss_pi(data):
-        o, a = data['obs'], data['act']
+        o, a = data["obs"], data["act"]
         a_pred = ac.pi(o)
-        return torch.mean(torch.sum((a - a_pred)**2, dim=1))
+        return torch.mean(torch.sum((a - a_pred) ** 2, dim=1))
 
     def compute_loss_safe(data):
-        o, a = data['obs'], data['act']
+        o, a = data["obs"], data["act"]
         safe_pred = ac.pi_safe(o).squeeze()
         a_pred = ac.pi(o).detach()
-        targets = torch.lt(torch.sum((a - a_pred)**2, dim=1), safety_threshold).float().detach()
+        targets = (
+            torch.lt(torch.sum((a - a_pred) ** 2, dim=1), safety_threshold)
+            .float()
+            .detach()
+        )
         return torch.nn.BCELoss()(safe_pred, targets)
 
     # Set up optimizers
@@ -182,7 +236,7 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
         logger.store(LossSafe=loss_safe.item())
 
     # Prepare for interaction with environment
-    online_burden = 0 # how many labels we get from supervisor
+    online_burden = 0  # how many labels we get from supervisor
     num_switches_to_human = 0
     num_switches_to_robot = 0
 
@@ -203,42 +257,56 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
                     rew.append(int(env._check_success()))
                 ep_ret += r
                 ep_len += 1
-            print('episode #{} success? {}'.format(j, rew[-1]))
+            print("episode #{} success? {}".format(j, rew[-1]))
             if robosuite:
                 env.close()
-        print('Test Success Rate:', sum(rew)/num_test_episodes)
-        pickle.dump({'obs': np.stack(obs), 'act': np.stack(act), 'done': np.array(done), 'rew': np.array(rew)}, open(logger_kwargs['output_dir']+'/test{}.pkl'.format(epoch), 'wb'))
+        print("Test Success Rate:", sum(rew) / num_test_episodes)
+        pickle.dump(
+            {
+                "obs": np.stack(obs),
+                "act": np.stack(act),
+                "done": np.array(done),
+                "rew": np.array(rew),
+            },
+            open(logger_kwargs["output_dir"] + "/test{}.pkl".format(epoch), "wb"),
+        )
 
     # initial BC
     for j in range(bc_epochs):
         for _ in range(grad_steps):
             batch = replay_buffer.sample_batch(batch_size)
             update_pi(data=batch)
-        logger.log_tabular('Epoch', j)
-        logger.log_tabular('TotalEnvInteracts', 0)
-        logger.log_tabular('LossPi', average_only=True)
-        logger.log_tabular('LossSafe', 0)
+        logger.log_tabular("Epoch", j)
+        logger.log_tabular("TotalEnvInteracts", 0)
+        logger.log_tabular("LossPi", average_only=True)
+        logger.log_tabular("LossSafe", 0)
         logger.dump_tabular()
 
     for j in range(bc_epochs):
         for _ in range(grad_steps):
             batch = safe_buffer.sample_batch(batch_size)
             update_pi_safe(data=batch)
-        logger.log_tabular('Epoch', j)
-        logger.log_tabular('TotalEnvInteracts', 0)
-        logger.log_tabular('LossPi', 0)
-        logger.log_tabular('LossSafe', average_only=True)
+        logger.log_tabular("Epoch", j)
+        logger.log_tabular("TotalEnvInteracts", 0)
+        logger.log_tabular("LossPi", 0)
+        logger.log_tabular("LossSafe", average_only=True)
         logger.dump_tabular()
 
     # sanity check safe thresh
     num_unsafe = 0
     for i in range(replay_buffer.size):
-        a_pred = ac.act(torch.as_tensor(safe_buffer.obs_buf[i], dtype=torch.float32, device=device))
+        a_pred = ac.act(
+            torch.as_tensor(safe_buffer.obs_buf[i], dtype=torch.float32, device=device)
+        )
         a_sup = safe_buffer.act_buf[i]
         if sum((a_pred - a_sup) ** 2) > safety_threshold:
             num_unsafe += 1
     # In the SafeDAgger paper, this value is around 20%
-    print("{}% of BC data points are not safe with threshold {}".format(num_unsafe*100/replay_buffer.size, tau_sup))
+    print(
+        "{}% of BC data points are not safe with threshold {}".format(
+            num_unsafe * 100 / replay_buffer.size, tau_sup
+        )
+    )
 
     torch.cuda.empty_cache()
 
@@ -252,8 +320,16 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
         while i < obs_per_iter:
             o, d, expert_mode, ep_len = env.reset(), False, False, 0
             if robosuite:
-                robosuite_cfg['INPUT_DEVICE'].start_control()
-            obs, act, rew, done, sup, safety, disc = [o], [], [], [], [], [ac.classify(o)], []
+                robosuite_cfg["INPUT_DEVICE"].start_control()
+            obs, act, rew, done, sup, safety, disc = (
+                [o],
+                [],
+                [],
+                [],
+                [],
+                [ac.classify(o)],
+                [],
+            )
             while i < obs_per_iter and not d:
                 a = ac.act(o)
                 a = np.clip(a, -act_limit, act_limit)
@@ -265,17 +341,17 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
                     a_expert_noisy = np.clip(a_expert_noisy, -act_limit, act_limit)
                     replay_buffer.store(o, a_expert)
                     online_burden += 1
-                    #if ac.classify(o) >= 0.5: # uncomment this line and comment the one below to use SafeDAgger switching
-                    if sum((a - a_expert) ** 2) < safety_threshold * tau_auto: 
+                    # if ac.classify(o) >= 0.5: # uncomment this line and comment the one below to use SafeDAgger switching
+                    if sum((a - a_expert) ** 2) < safety_threshold * tau_auto:
                         print("Switch to Robot")
-                        expert_mode = False 
+                        expert_mode = False
                         num_switches_to_robot += 1
                         o, _, d, _ = env.step(a_expert)
                     else:
                         o, _, d, _ = env.step(a_expert_noisy)
                     act.append(a_expert)
                     sup.append(1)
-                    disc.append(sum((a - a_expert)**2))
+                    disc.append(sum((a - a_expert) ** 2))
                 elif ac.classify(o) < 0.5:
                     print("Switch to Human")
                     num_switches_to_human += 1
@@ -287,7 +363,7 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
                     sup.append(0)
                     disc.append(0)
                 if robosuite:
-                    d = (ep_len >= robosuite_cfg['MAX_EP_LEN']) or env._check_success()
+                    d = (ep_len >= robosuite_cfg["MAX_EP_LEN"]) or env._check_success()
                     done.append(d)
                     rew.append(int(env._check_success()))
                 obs.append(o)
@@ -295,14 +371,26 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
                 i += 1
                 ep_len += 1
             ep_num += 1
-            if (ep_len >= robosuite_cfg['MAX_EP_LEN']):
+            if ep_len >= robosuite_cfg["MAX_EP_LEN"]:
                 fail_ct += 1
             total_env_interacts += ep_len
             if robosuite:
                 env.close()
-            logging_data.append({'obs': np.stack(obs), 'act': np.stack(act), 'done': np.array(done), 'rew': np.array(rew), 'sup': np.array(sup), 
-                'safety': np.array(safety), 'disc': np.array(disc)})
-            pickle.dump(logging_data, open(logger_kwargs['output_dir']+'/iter{}.pkl'.format(t), 'wb'))
+            logging_data.append(
+                {
+                    "obs": np.stack(obs),
+                    "act": np.stack(act),
+                    "done": np.array(done),
+                    "rew": np.array(rew),
+                    "sup": np.array(sup),
+                    "safety": np.array(safety),
+                    "disc": np.array(disc),
+                }
+            )
+            pickle.dump(
+                logging_data,
+                open(logger_kwargs["output_dir"] + "/iter{}.pkl".format(t), "wb"),
+            )
         # retrain from scratch each time
         ac = actor_critic(env.observation_space, env.action_space, device, **ac_kwargs)
         pi_optimizer = Adam(ac.pi.parameters(), lr=pi_lr)
@@ -318,13 +406,13 @@ def lazy(env, iters=10, actor_critic=core.MLP, ac_kwargs=dict(),
         # End of epoch handling
         # logging
         logger.save_state(dict())
-        logger.log_tabular('Epoch', t)
-        logger.log_tabular('TotalEnvInteracts', total_env_interacts)
-        logger.log_tabular('LossPi', average_only=True)
-        logger.log_tabular('LossSafe', average_only=True)
-        logger.log_tabular('TotalEpisodes', ep_num)
-        logger.log_tabular('TotalSuccesses', ep_num - fail_ct)
-        logger.log_tabular('OnlineBurden', online_burden)
-        logger.log_tabular('NumSwitchTo', num_switches_to_human)
-        logger.log_tabular('NumSwitchBack', num_switches_to_robot)
+        logger.log_tabular("Epoch", t)
+        logger.log_tabular("TotalEnvInteracts", total_env_interacts)
+        logger.log_tabular("LossPi", average_only=True)
+        logger.log_tabular("LossSafe", average_only=True)
+        logger.log_tabular("TotalEpisodes", ep_num)
+        logger.log_tabular("TotalSuccesses", ep_num - fail_ct)
+        logger.log_tabular("OnlineBurden", online_burden)
+        logger.log_tabular("NumSwitchTo", num_switches_to_human)
+        logger.log_tabular("NumSwitchBack", num_switches_to_robot)
         logger.dump_tabular()

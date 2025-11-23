@@ -2,6 +2,7 @@ import json
 import numpy as np
 import logging
 
+
 def convert_json(obj, _visited=None):
     """
     Convert obj to something JSON-serializable.
@@ -36,8 +37,7 @@ def convert_json(obj, _visited=None):
     # dict -> dict
     if isinstance(obj, dict):
         return {
-            convert_json(k, _visited): convert_json(v, _visited)
-            for k, v in obj.items()
+            convert_json(k, _visited): convert_json(v, _visited) for k, v in obj.items()
         }
 
     # tuple -> list (JSON has no tuple)
@@ -66,7 +66,8 @@ def convert_json(obj, _visited=None):
         return repr(obj)
     except Exception:
         return f"<unreprable:{type(obj).__name__}>"
-    
+
+
 def is_json_serializable(v):
     try:
         json.dumps(v)
