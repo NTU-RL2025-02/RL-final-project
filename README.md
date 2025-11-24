@@ -51,3 +51,7 @@ to record (still fixing)
 ```sh
 python scripts/run_thriftydagger.py test --gen_data
 ```
+
+
+## Flow
+1. Train a good model with robomimic
