@@ -97,3 +97,28 @@ python scripts/run_thriftydagger.py test --gen_data
 ## Flow
 
 1. Train a good model with robomimic.
+
+--
+
+## Branch workflow
+
+We follow a simple branch naming convention:
+
+- `main`: stable branch for releases / final submissions.
+- `dev/<who>-<topic>`: development branches for normal coding work.
+  - e.g., `dev/aaron-env-wrapper`, `dev/mia-fix-robomimic-seed`
+- `exp/<date>-<env>-<algo>-<who>-<tag>`: experiment branches for RL experiments.
+  - e.g., `exp/20251123-square-bc-aaron-baseline`, `exp/20251124-square-thriftydagger-aaron-cbf-v1`
+- `hotfix/<who>-<topic>`: quick fixes on top of `main` (urgent bugfixes, broken configs, etc.).
+  - e.g., `hotfix/aaron-fix-square-config`, `hotfix/mia-robomimic-path-bug`
+
+Rules:
+
+- Only lowercase letters, digits, `-`, `_`, `.`, and `/` are allowed.
+- Branch name must be one of:
+  - `main`
+  - `dev/<something>`
+  - `exp/<something>`
+  - `hotfix/<something>`
+
+A GitHub Actions workflow (`.github/workflows/enforce-branch-name.yml`) will reject pushes / PRs from branches that do not follow this convention.
