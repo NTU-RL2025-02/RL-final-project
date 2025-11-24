@@ -42,10 +42,7 @@ pip install robosuite==1.5.1
 ```sh
 # in RL-final-project
 cd thriftydagger
-conda create -n thrifty-dagger python=3.10
-conda activate thrifty-dagger
 pip install -e .
-# actually I work in robomimic env
 ```
 
 ---
