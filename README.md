@@ -5,14 +5,16 @@ Repository for RL final project - create for blank now
 ```sh
 git clone https://github.com/NTU-RL2025-02/RL-final-project
 cd RL-final-project
-git clone https://github.com/NTU-RL2025-02/robomimic
+
+git submodule update --init --recursive
+
 cd robomimic
 conda create -n robomimic python=3.10
 conda activate robomimic
 pip install -e .
 pip install robosuite==1.5.1
+
 # in RL-final-project
-git clone https://github.com/NTU-RL2025-02/thriftydagger
 cd thriftydagger
 conda create -n thrifty-dagger python=3.10
 conda activate thrifty-dagger
