@@ -1,80 +1,80 @@
 # RL-final-project
 
-Repository for RL final project – currently a blank template.
+Main repository for the RL final project. It is a thin wrapper around two submodules:
+
+- `robomimic/`: train imitation / offline RL policies on robosuite datasets.
+- `thriftydagger/`: run ThriftyDAgger with a robomimic policy as the expert.
 
 ## Clone with submodules
-
-This repository uses Git submodules for `robomimic` and `thriftydagger`.
-
-Recommended way (clone + init submodules in one step):
 
 ```sh
 git clone --recurse-submodules https://github.com/NTU-RL2025-02/RL-final-project
 cd RL-final-project
 ```
 
-If you already cloned without `--recurse-submodules`:
+If you already cloned without `--recurse-submodules`, run `git submodule update --init --recursive`.
 
-```sh
-git clone https://github.com/NTU-RL2025-02/RL-final-project
-cd RL-final-project
-git submodule update --init --recursive
-```
-
-To update submodules to the latest `master` (of each submodule):
-
-```sh
-git submodule update --init --remote --recursive
-```
+To update submodules to their tracked branches: `git submodule update --init --remote --recursive`.
 
 ---
 
-## If you want to use new robosuite + mujoco, please
+## One conda environment for everything
+
+The two submodules are compatible in a single environment. ThriftyDAgger’s dependencies are a superset of robomimic’s, and both work with `robosuite==1.5.1` + `mujoco>=2.3` (tested on Python 3.10).
+
+1. Create and activate the env
 
 ```sh
-cd robomimic
-conda create -n robomimic python=3.10
-conda activate robomimic
-pip install -e .
-pip install robosuite==1.5.1
+conda create -n rl-final python=3.10
+conda activate rl-final
 ```
 
+2. Install PyTorch for your platform (pick the right command from https://pytorch.org)
+
 ```sh
-# in RL-final-project
-cd thriftydagger
-pip install -e .
+# Example: CPU / Apple Silicon
+pip install torch torchvision
+# Example: CUDA 12.1
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 ```
+
+3. Install project packages (from repo root)
+
+```sh
+pip install -e robomimic
+pip install -e thriftydagger "robosuite==1.5.1" "mujoco>=2.3" "gymnasium>=0.29"
+```
+
+4. (Optional) For headless rendering set `export MUJOCO_GL=egl` (Linux) or `export MUJOCO_GL=glfw` (Mac).
+
+You can now import everything from the same shell: `python -c "import robomimic, thrifty, robosuite; print('ok')"` should print `ok`.
 
 ---
 
-## Robomimic
+## Robomimic (training policies)
 
-To run robomimic:
+Download datasets:
 
 ```sh
-# in robomimic/robomimic/scripts
-python download_datasets.py \
-  --tasks square \
-  --dataset_types ph \
-  --hdf5_types low_dim
+cd robomimic/robomimic/scripts
+python download_datasets.py --tasks square --dataset_types ph --hdf5_types low_dim
 ```
 
-To train robomimic model:
+Train (add `--device cuda:0` if you have a GPU):
 
 ```sh
 # in robomimic
 python robomimic/scripts/train.py --config robomimic/exps/paper/core/square/ph/low_dim/bc_rnn.json
-# if having a GPU: add --device cuda:0 at the back
 ```
 
 ---
 
-## Thrifty DAgger
+## ThriftyDAgger (using the same env)
 
-To run (still fixing):
+1. Put a trained robomimic checkpoint under `thriftydagger/scripts/expert_model/` (see the default path in `thriftydagger/scripts/run_thriftydagger.py`).
+2. Run from inside `thriftydagger`:
 
 ```sh
-# move the model trained from robomimic to scripts/expert_model first
 python scripts/run_thriftydagger.py square_data --environment Square --no_render --gen_data
 python scripts/run_thriftydagger.py test --no_render
 # or
@@ -94,8 +94,6 @@ python scripts/run_thriftydagger.py test --gen_data
 ## Flow
 
 1. Train a good model with robomimic.
-
---
 
 ## Branch workflow
 
