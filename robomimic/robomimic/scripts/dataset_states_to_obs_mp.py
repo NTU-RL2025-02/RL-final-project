@@ -65,6 +65,7 @@ Example usage:
         --done_mode 2 --camera_names agentview robot0_eye_in_hand --camera_height 84 --camera_width 84 \
         --num_procs 6 --gpu_ids 0 1 --procs_per_gpu 4 2
 """
+
 import time
 import socket
 import traceback
@@ -94,10 +95,12 @@ except ImportError:
     print("WARNING: could not import mimicgen envs")
 
 
-def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, progress_queue, gpu_id=None):
+def process_demo_batch(
+    process_id, args, env_meta, work_queue, result_queue, progress_queue, gpu_id=None
+):
     """
     Process demonstrations from a work queue until the queue is empty.
-    
+
     Args:
         process_id (int): ID of this worker process
         args: Script arguments
@@ -109,10 +112,10 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
     """
     # Set GPU environment variables if gpu_id is specified
     if gpu_id is not None:
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
-        os.environ['MUJOCO_EGL_DEVICE_ID'] = str(gpu_id)
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+        os.environ["MUJOCO_EGL_DEVICE_ID"] = str(gpu_id)
         print(f"Process {process_id} using GPU {gpu_id}")
-    
+
     # robocasa-specific features
     if args.generative_textures:
         env_meta["env_kwargs"]["generative_textures"] = "100p"
@@ -122,25 +125,25 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
     # Create environment for this process
     env = EnvUtils.create_env_for_data_processing(
         env_meta=env_meta,
-        camera_names=args.camera_names, 
-        camera_height=args.camera_height, 
-        camera_width=args.camera_width, 
+        camera_names=args.camera_names,
+        camera_height=args.camera_height,
+        camera_width=args.camera_width,
         reward_shaping=args.shaped,
         use_depth_obs=args.depth,
     )
 
     # Open input file in read mode
     f = h5py.File(args.dataset, "r")
-    
+
     # Create temporary output file for this process
     temp_output = f"{args.dataset}_temp_{process_id}.hdf5"
     f_out = h5py.File(temp_output, "w")
     data_grp = f_out.create_group("data")
-    
+
     total_samples = 0
     num_success = 0
     processed_demos = []
-    
+
     # Process demos until the queue is empty
     while True:
         try:
@@ -148,11 +151,15 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
             ep = work_queue.get(timeout=1)
             if ep is None:  # Poison pill
                 break
-            
+
             # prepare states to reload from
             is_robosuite_env = EnvUtils.is_robosuite_env(env_meta)
-            is_simpler_env = EnvUtils.is_simpler_env(env_meta) or EnvUtils.is_simpler_ov_env(env_meta)
-            is_factory_env = EnvUtils.is_factory_env(env_meta) or EnvUtils.is_furniture_sim_env(env_meta)
+            is_simpler_env = EnvUtils.is_simpler_env(
+                env_meta
+            ) or EnvUtils.is_simpler_ov_env(env_meta)
+            is_factory_env = EnvUtils.is_factory_env(
+                env_meta
+            ) or EnvUtils.is_furniture_sim_env(env_meta)
 
             if is_simpler_env or is_factory_env:
                 # states are dictionaries - make list of dictionaries
@@ -160,12 +167,10 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
                 states = []
                 state_grp = f["data/{}/states".format(ep)]
                 for i in range(traj_len):
-                    states.append(
-                        { k : np.array(state_grp[k][i]) for k in state_grp }
-                    )
+                    states.append({k: np.array(state_grp[k][i]) for k in state_grp})
             else:
                 states = f["data/{}/states".format(ep)][()]
-            
+
             initial_state = dict(states=states[0])
             if is_robosuite_env:
                 initial_state["model"] = f["data/{}".format(ep)].attrs["model_file"]
@@ -176,15 +181,15 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
             actions = f["data/{}/actions".format(ep)][()]
             actions_abs = f["data/{}/actions_abs".format(ep)][()]
             traj, is_success, camera_info = extract_trajectory(
-                env=env, 
-                initial_state=initial_state, 
-                states=states, 
+                env=env,
+                initial_state=initial_state,
+                states=states,
                 actions=actions,
                 actions_abs=actions_abs,
                 done_mode=args.done_mode,
                 use_actions=args.use_actions,
-                camera_names=args.camera_names, 
-                camera_height=args.camera_height, 
+                camera_names=args.camera_names,
+                camera_height=args.camera_height,
                 camera_width=args.camera_width,
             )
             num_success += int(is_success)
@@ -200,24 +205,40 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
             #            consistent as well
             ep_data_grp = data_grp.create_group(ep)
             ep_data_grp.create_dataset("actions", data=np.array(traj["actions"]))
-            ep_data_grp.create_dataset("actions_abs", data=np.array(traj["actions_abs"]))
+            ep_data_grp.create_dataset(
+                "actions_abs", data=np.array(traj["actions_abs"])
+            )
             if is_simpler_env or is_factory_env:
                 for k in traj["states"]:
-                    ep_data_grp.create_dataset("states/{}".format(k), data=np.array(traj["states"][k]))
+                    ep_data_grp.create_dataset(
+                        "states/{}".format(k), data=np.array(traj["states"][k])
+                    )
             else:
                 ep_data_grp.create_dataset("states", data=np.array(traj["states"]))
             ep_data_grp.create_dataset("rewards", data=np.array(traj["rewards"]))
             ep_data_grp.create_dataset("dones", data=np.array(traj["dones"]))
             for k in traj["obs"]:
                 if args.compress:
-                    ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]), compression="gzip")
+                    ep_data_grp.create_dataset(
+                        "obs/{}".format(k),
+                        data=np.array(traj["obs"][k]),
+                        compression="gzip",
+                    )
                 else:
-                    ep_data_grp.create_dataset("obs/{}".format(k), data=np.array(traj["obs"][k]))
+                    ep_data_grp.create_dataset(
+                        "obs/{}".format(k), data=np.array(traj["obs"][k])
+                    )
                 if not args.exclude_next_obs:
                     if args.compress:
-                        ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]), compression="gzip")
+                        ep_data_grp.create_dataset(
+                            "next_obs/{}".format(k),
+                            data=np.array(traj["next_obs"][k]),
+                            compression="gzip",
+                        )
                     else:
-                        ep_data_grp.create_dataset("next_obs/{}".format(k), data=np.array(traj["next_obs"][k]))
+                        ep_data_grp.create_dataset(
+                            "next_obs/{}".format(k), data=np.array(traj["next_obs"][k])
+                        )
 
             # episode metadata
             if is_robosuite_env:
@@ -234,7 +255,7 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
             processed_demos.append(ep)
             # Report progress
             progress_queue.put((1, total_samples))
-            
+
         except Empty:
             # Queue is empty, check if we should continue waiting
             if work_queue.empty():
@@ -243,10 +264,10 @@ def process_demo_batch(process_id, args, env_meta, work_queue, result_queue, pro
     # Store chunk metadata
     data_grp.attrs["total"] = total_samples
     data_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4)
-    
+
     f.close()
     f_out.close()
-    
+
     # Put result in result queue
     result_queue.put((temp_output, total_samples, num_success, processed_demos))
 
@@ -268,9 +289,11 @@ def get_gpu_allocation(num_procs, gpu_ids, procs_per_gpu=None):
 
     if procs_per_gpu is not None:
         if len(procs_per_gpu) != len(gpu_ids):
-            raise ValueError(f"--procs_per_gpu must have same length as --gpu_ids. "
-                           f"Got {len(procs_per_gpu)} values for {len(gpu_ids)} GPUs.")
-        
+            raise ValueError(
+                f"--procs_per_gpu must have same length as --gpu_ids. "
+                f"Got {len(procs_per_gpu)} values for {len(gpu_ids)} GPUs."
+            )
+
         total_allocated_procs = sum(procs_per_gpu)
         if total_allocated_procs != num_procs:
             # Adjust procs_per_gpu to match num_procs
@@ -278,19 +301,23 @@ def get_gpu_allocation(num_procs, gpu_ids, procs_per_gpu=None):
                 # Need to reduce processes
                 excess = total_allocated_procs - num_procs
                 # Sort GPUs by number of processes (descending) to reduce from most loaded GPUs first
-                gpu_loads = sorted(enumerate(procs_per_gpu), key=lambda x: x[1], reverse=True)
-                
+                gpu_loads = sorted(
+                    enumerate(procs_per_gpu), key=lambda x: x[1], reverse=True
+                )
+
                 for i in range(excess):
                     # Reduce processes from most loaded GPU
                     gpu_idx = gpu_loads[i % len(gpu_loads)][0]
                     procs_per_gpu[gpu_idx] -= 1
-                
+
                 print(f"Adjusted GPU allocation to match {num_procs} processes:")
                 for gpu_id, num_procs_for_gpu in zip(gpu_ids, procs_per_gpu):
                     print(f"  GPU {gpu_id}: {num_procs_for_gpu} processes")
             else:
-                raise ValueError(f"Sum of --procs_per_gpu ({total_allocated_procs}) must equal --num_procs ({num_procs})")
-        
+                raise ValueError(
+                    f"Sum of --procs_per_gpu ({total_allocated_procs}) must equal --num_procs ({num_procs})"
+                )
+
         # Create allocation list based on procs_per_gpu
         gpu_allocation = []
         for gpu_id, num_procs_for_gpu in zip(gpu_ids, procs_per_gpu):
@@ -299,7 +326,7 @@ def get_gpu_allocation(num_procs, gpu_ids, procs_per_gpu=None):
         # Use round-robin allocation
         gpu_allocation = [gpu_ids[i % len(gpu_ids)] for i in range(num_procs)]
         print(f"Using round-robin GPU allocation across {len(gpu_ids)} GPUs: {gpu_ids}")
-    
+
     return gpu_allocation
 
 
@@ -322,14 +349,16 @@ def dataset_states_to_obs_mp(args):
     # Apply start index if provided
     if args.start is not None:
         if args.start >= len(demos):
-            raise ValueError(f"Start index {args.start} is larger than number of demos {len(demos)}")
-        demos = demos[args.start:]
-        original_demos = original_demos[args.start:]
+            raise ValueError(
+                f"Start index {args.start} is larger than number of demos {len(demos)}"
+            )
+        demos = demos[args.start :]
+        original_demos = original_demos[args.start :]
 
     # Maybe reduce number of demonstrations
     if args.n is not None:
-        demos = demos[:args.n]
-        original_demos = original_demos[:args.n]
+        demos = demos[: args.n]
+        original_demos = original_demos[: args.n]
 
     if len(demos) == 0:
         raise ValueError("No demonstrations to process after applying start/n filters")
@@ -337,18 +366,20 @@ def dataset_states_to_obs_mp(args):
     # Cap number of processes to number of demos
     num_processes = min(args.num_procs, len(demos))
     if num_processes < args.num_procs:
-        print(f"\nWarning: Reducing number of processes from {args.num_procs} to {num_processes} "
-              f"to match number of demos")
+        print(
+            f"\nWarning: Reducing number of processes from {args.num_procs} to {num_processes} "
+            f"to match number of demos"
+        )
 
     # Initialize multiprocessing queues
     work_queue = mp.Queue()
     result_queue = mp.Queue()
     progress_queue = mp.Queue()
-    
+
     # Fill work queue with demos
     for demo in demos:
         work_queue.put(demo)
-    
+
     # Add poison pills to signal processes to terminate
     for _ in range(num_processes):
         work_queue.put(None)
@@ -357,12 +388,18 @@ def dataset_states_to_obs_mp(args):
     gpu_allocation = None
     if args.gpu_ids is not None:
         if len(args.gpu_ids) == 0:
-            print("Warning: --gpu_ids specified but no GPU IDs provided. Running without GPU allocation.")
+            print(
+                "Warning: --gpu_ids specified but no GPU IDs provided. Running without GPU allocation."
+            )
         else:
             # Get GPU allocation for the actual number of processes
-            gpu_allocation = get_gpu_allocation(num_processes, args.gpu_ids, args.procs_per_gpu)
+            gpu_allocation = get_gpu_allocation(
+                num_processes, args.gpu_ids, args.procs_per_gpu
+            )
 
-    print(f"\nProcessing {len(demos)} demonstrations using {num_processes} processes...")
+    print(
+        f"\nProcessing {len(demos)} demonstrations using {num_processes} processes..."
+    )
     if args.start is not None:
         print(f"Starting from demo index {args.start}")
     if args.n is not None:
@@ -375,7 +412,7 @@ def dataset_states_to_obs_mp(args):
             print(f"Round-robin GPU allocation: {args.gpu_ids}")
     else:
         print(f"Running without explicit GPU allocation")
-    
+
     # Initialize multiprocessing with progress bars
     mp.freeze_support()  # For Windows support
     processes = []
@@ -386,8 +423,19 @@ def dataset_states_to_obs_mp(args):
             gpu_id = None
             if gpu_allocation:
                 gpu_id = gpu_allocation[i]
-            
-            p = mp.Process(target=process_demo_batch, args=(i, args, env_meta, work_queue, result_queue, progress_queue, gpu_id))
+
+            p = mp.Process(
+                target=process_demo_batch,
+                args=(
+                    i,
+                    args,
+                    env_meta,
+                    work_queue,
+                    result_queue,
+                    progress_queue,
+                    gpu_id,
+                ),
+            )
             p.start()
             processes.append(p)
 
@@ -395,7 +443,7 @@ def dataset_states_to_obs_mp(args):
         pbar = tqdm(total=len(demos), desc="Processing demos")
         total_samples = 0
         completed_demos = 0
-        
+
         while completed_demos < len(demos):
             try:
                 # Get progress update with timeout
@@ -418,7 +466,9 @@ def dataset_states_to_obs_mp(args):
         results = []
         demo_locations = {}  # Maps demo name to temp file location
         while not result_queue.empty():
-            temp_output, total_samples, num_success, processed_demos = result_queue.get()
+            temp_output, total_samples, num_success, processed_demos = (
+                result_queue.get()
+            )
             results.append((temp_output, total_samples, num_success))
             # Record which demos are in which temp files
             for demo in processed_demos:
@@ -429,15 +479,15 @@ def dataset_states_to_obs_mp(args):
         for p in processes:
             if p.is_alive():
                 p.terminate()
-    
+
     # Merge results in the original demo order
     output_path = os.path.join(os.path.dirname(args.dataset), args.output_name)
-    
+
     print("\nMerging temporary files...")
     with h5py.File(output_path, "w") as f_out:
         data_grp = f_out.create_group("data")
         total_samples = 0
-        
+
         # Copy data maintaining original demo order by following the original demos list
         pbar = tqdm(demos, desc="Merging")
         try:
@@ -454,12 +504,12 @@ def dataset_states_to_obs_mp(args):
                 pbar.set_postfix({"total_samples": total_samples})
         finally:
             pbar.close()
-        
+
         # Copy filter masks if they exist in the original file
         with h5py.File(args.dataset, "r") as f:
             if "mask" in f:
                 f.copy("mask", f_out)
-        
+
         data_grp.attrs["total"] = total_samples
 
     print("\nCleaning up temporary files...")
@@ -471,14 +521,16 @@ def dataset_states_to_obs_mp(args):
 
     # Calculate total successes
     total_successes = sum(success for _, _, success in results)
-    
+
     if args.use_actions:
-        print(f"\nAction playback: got {total_successes} successes out of {len(demos)} demos.\n")
+        print(
+            f"\nAction playback: got {total_successes} successes out of {len(demos)} demos.\n"
+        )
 
     # Get memory usage
     process = psutil.Process(os.getpid())
     mem_usage = int(process.memory_info().rss / 1000000)
-    
+
     important_stats = dict(
         name=output_path,
         num_demos=len(demos),
@@ -524,8 +576,8 @@ if __name__ == "__main__":
 
     # flag for reward shaping
     parser.add_argument(
-        "--shaped", 
-        action='store_true',
+        "--shaped",
+        action="store_true",
         help="(optional) use shaped rewards",
     )
 
@@ -533,7 +585,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--camera_names",
         type=str,
-        nargs='+',
+        nargs="+",
         default=[],
         help="(optional) camera name(s) to use for image observations. Leave out to not use image observations.",
     )
@@ -554,13 +606,13 @@ if __name__ == "__main__":
 
     # flag for including depth observations per camera
     parser.add_argument(
-        "--depth", 
-        action='store_true',
+        "--depth",
+        action="store_true",
         help="(optional) use depth observations for each camera",
     )
 
-    # specifies how the "done" signal is written. If "0", then the "done" signal is 1 wherever 
-    # the transition (s, a, s') has s' in a task completion state. If "1", the "done" signal 
+    # specifies how the "done" signal is written. If "0", then the "done" signal is 1 wherever
+    # the transition (s, a, s') has s' in a task completion state. If "1", the "done" signal
     # is one at the end of every trajectory. If "2", the "done" signal is 1 at task completion
     # states for successful trajectories and 1 at the end of all trajectories.
     parser.add_argument(
@@ -573,50 +625,50 @@ if __name__ == "__main__":
 
     # flag for copying rewards from source file instead of re-writing them
     parser.add_argument(
-        "--copy_rewards", 
-        action='store_true',
+        "--copy_rewards",
+        action="store_true",
         help="(optional) copy rewards from source file instead of inferring them",
     )
 
     # flag for copying dones from source file instead of re-writing them
     parser.add_argument(
-        "--copy_dones", 
-        action='store_true',
+        "--copy_dones",
+        action="store_true",
         help="(optional) copy dones from source file instead of inferring them",
     )
 
     # flag for using action playback to collect dataset instead of resetting states one by one
     parser.add_argument(
-        "--use-actions", 
-        action='store_true',
+        "--use-actions",
+        action="store_true",
         help="(optional) flag for using action playback to collect dataset instead of resetting states one by one",
     )
 
     # flag to exclude next obs in dataset
     parser.add_argument(
-        "--exclude-next-obs", 
-        action='store_true',
+        "--exclude-next-obs",
+        action="store_true",
         help="(optional) exclude next obs in dataset",
     )
 
     # flag to compress observations with gzip option in hdf5
     parser.add_argument(
-        "--compress", 
-        action='store_true',
+        "--compress",
+        action="store_true",
         help="(optional) compress observations with gzip option in hdf5",
     )
 
     # flag for using generative textures
     parser.add_argument(
-        "--generative-textures", 
-        action='store_true',
+        "--generative-textures",
+        action="store_true",
         help="(optional) use generative textures for robosuite environments",
     )
 
     # flag for randomizing cameras
     parser.add_argument(
-        "--randomize-cameras", 
-        action='store_true',
+        "--randomize-cameras",
+        action="store_true",
         help="(optional) randomize camera poses for robosuite environments",
     )
 
@@ -632,7 +684,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gpu_ids",
         type=int,
-        nargs='*',
+        nargs="*",
         default=None,
         help="(optional) GPU IDs to use for processes. Processes will be distributed across these GPUs in round-robin fashion. Example: --gpu_ids 0 1 2 3",
     )
@@ -641,7 +693,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--procs_per_gpu",
         type=int,
-        nargs='*',
+        nargs="*",
         default=None,
         help="(optional) Number of processes to allocate to each GPU. Must have same length as --gpu_ids. Example: --procs_per_gpu 3 2 2 1",
     )
@@ -649,7 +701,7 @@ if __name__ == "__main__":
     # Add no-slack argument
     parser.add_argument(
         "--no-slack",
-        action='store_true',
+        action="store_true",
         help="(optional) disable slack notifications",
     )
 
@@ -659,7 +711,7 @@ if __name__ == "__main__":
     try:
         t = time.time()
         important_stats = dataset_states_to_obs_mp(args)
-        time_taken_hrs = (time.time() - t) / 3600.
+        time_taken_hrs = (time.time() - t) / 3600.0
         important_stats["time_taken (hrs)"] = time_taken_hrs
         important_stats = json.dumps(important_stats, indent=4)
         print("\nExtraction Stats")
@@ -671,7 +723,10 @@ if __name__ == "__main__":
     # maybe give slack notification
     if Macros.SLACK_TOKEN is not None and (not args.no_slack):
         from robomimic.scripts.give_slack_notification import give_slack_notif
-        msg = "Completed the following dataset extraction run!\nHostname: {}\n".format(socket.gethostname())
+
+        msg = "Completed the following dataset extraction run!\nHostname: {}\n".format(
+            socket.gethostname()
+        )
         msg += "```{}```".format(res_str)
         if important_stats is not None:
             msg += "\nExtraction Stats"

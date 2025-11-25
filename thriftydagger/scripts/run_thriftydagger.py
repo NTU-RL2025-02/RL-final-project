@@ -26,9 +26,15 @@ from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoi
 # 這裡用你搬到比較短路徑的 expert model
 # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
 
-expert_pol, _ = policy_from_checkpoint(device = 'cuda', ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth")
-suboptimal_policy, _ = policy_from_checkpoint(device = 'cuda', ckpt_path="models/model_epoch_1000.pth")
-lang_emb = np.load('models/lang_emb.npy')
+expert_pol, _ = policy_from_checkpoint(
+    device="cuda", ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth"
+)
+suboptimal_policy, _ = policy_from_checkpoint(
+    device="cuda", ckpt_path="models/model_epoch_1000.pth"
+)
+lang_emb = np.load("models/lang_emb.npy")
+
+
 def get_real_depth_map(env, depth_map):
     """
     Reproduced from https://github.com/ARISE-Initiative/robosuite/blob/c57e282553a4f42378f2635b9a3cbc4afba270fd/robosuite/utils/camera_utils.py#L106
@@ -41,25 +47,31 @@ def get_real_depth_map(env, depth_map):
     far = env.sim.model.vis.map.zfar * extent
     near = env.sim.model.vis.map.znear * extent
     return near / (1.0 - depth_map * (1.0 - near / far))
+
+
 def get_observation(env, di):
     """
     Get current environment observation dictionary.
 
     Args:
-        di (dict): current raw observation dictionary from robosuite to wrap and provide 
+        di (dict): current raw observation dictionary from robosuite to wrap and provide
             as a dictionary. If not provided, will be queried from robosuite.
     """
     ret = {}
     for k in di:
-        if (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(key=k, obs_modality="rgb"):
+        if (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(
+            key=k, obs_modality="rgb"
+        ):
             # by default images from mujoco are flipped in height
             ret[k] = di[k][::-1].copy()
-        elif (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(key=k, obs_modality="depth"):
+        elif (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(
+            key=k, obs_modality="depth"
+        ):
             # by default depth images from mujoco are flipped in height
             ret[k] = di[k][::-1].copy()
             if len(ret[k].shape) == 2:
-                ret[k] = ret[k][..., None] # (H, W, 1)
-            assert len(ret[k].shape) == 3 
+                ret[k] = ret[k][..., None]  # (H, W, 1)
+            assert len(ret[k].shape) == 3
             # scale entries in depth map to correspond to real distance.
             ret[k] = get_real_depth_map(ret[k])
 
@@ -72,8 +84,11 @@ def get_observation(env, di):
         # ensures that we don't accidentally add robot wrist images a second time
         pf = robot.robot_model.naming_prefix
         for k in di:
-            if k.startswith(pf) and (k not in ret) and \
-                    (not k.endswith("proprio-state")):
+            if (
+                k.startswith(pf)
+                and (k not in ret)
+                and (not k.endswith("proprio-state"))
+            ):
                 ret[k] = np.array(di[k])
 
     ret[LangUtils.LANG_EMB_OBS_KEY] = np.array(lang_emb)
@@ -415,9 +430,9 @@ if __name__ == "__main__":
                 target_rate=args.targetrate,
                 seed=args.seed,
                 expert_policy=expert_pol,
-                suboptimal_policy=suboptimal_policy, 
-                extra_obs_extractor=get_observation, 
-                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-30.pkl",
+                suboptimal_policy=suboptimal_policy,
+                extra_obs_extractor=get_observation,
+                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
                 robosuite=True,
                 robosuite_cfg=robosuite_cfg,
                 q_learning=True,

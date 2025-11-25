@@ -2,6 +2,7 @@
 A collection of utilities for working with observation dictionaries and
 different kinds of modalities such as images.
 """
+
 import numpy as np
 from copy import deepcopy
 from collections import OrderedDict
@@ -12,7 +13,7 @@ import torch.nn.functional as F
 import robomimic.utils.tensor_utils as TU
 
 # MACRO FOR VALID IMAGE CHANNEL SIZES
-VALID_IMAGE_CHANNEL_DIMS = {1, 3}       # depth, rgb
+VALID_IMAGE_CHANNEL_DIMS = {1, 3}  # depth, rgb
 
 # DO NOT MODIFY THIS!
 # This keeps track of observation types (modalities) - and is populated on call to @initialize_obs_utils_with_obs_specs.
@@ -41,27 +42,42 @@ OBS_MODALITY_CLASSES = {}
 # in their config, without having to manually register their class internally.
 # This also future-proofs us for any additional encoder / randomizer classes we would
 # like to add ourselves.
-OBS_ENCODER_CORES = {"None": None}          # Per-modality core net as defined in obs_cores.py, e.g., "VisualCore"
-OBS_RANDOMIZERS = {"None": None}            # Obs randomizer defined in obs_cores.py, e.g., "CropRandomizer"
-OBS_ENCODER_BACKBONES = {"None": None}      # Architecture backbones for encoding obervation, e.g., "ResNet18Conv"
+OBS_ENCODER_CORES = {
+    "None": None
+}  # Per-modality core net as defined in obs_cores.py, e.g., "VisualCore"
+OBS_RANDOMIZERS = {
+    "None": None
+}  # Obs randomizer defined in obs_cores.py, e.g., "CropRandomizer"
+OBS_ENCODER_BACKBONES = {
+    "None": None
+}  # Architecture backbones for encoding obervation, e.g., "ResNet18Conv"
 
 
 def register_obs_key(target_class):
-    assert target_class not in OBS_MODALITY_CLASSES, f"Already registered modality {target_class}!"
+    assert (
+        target_class not in OBS_MODALITY_CLASSES
+    ), f"Already registered modality {target_class}!"
     OBS_MODALITY_CLASSES[target_class.name] = target_class
 
 
 def register_encoder_core(target_class):
-    assert target_class not in OBS_ENCODER_CORES, f"Already registered obs encoder core {target_class}!"
+    assert (
+        target_class not in OBS_ENCODER_CORES
+    ), f"Already registered obs encoder core {target_class}!"
     OBS_ENCODER_CORES[target_class.__name__] = target_class
 
 
 def register_randomizer(target_class):
-    assert target_class not in OBS_RANDOMIZERS, f"Already registered obs randomizer {target_class}!"
+    assert (
+        target_class not in OBS_RANDOMIZERS
+    ), f"Already registered obs randomizer {target_class}!"
     OBS_RANDOMIZERS[target_class.__name__] = target_class
 
+
 def register_encoder_backbone(target_class):
-    assert target_class not in OBS_ENCODER_BACKBONES, f"Already registered obs encoder backbone {target_class}!"
+    assert (
+        target_class not in OBS_ENCODER_BACKBONES
+    ), f"Already registered obs encoder backbone {target_class}!"
     OBS_ENCODER_BACKBONES[target_class.__name__] = target_class
 
 
@@ -73,11 +89,14 @@ class ObservationKeyToModalityDict(dict):
     config. Thus, this dictionary will automatically handle those keys by implicitly associating them with the low_dim
     modality.
     """
+
     def __getitem__(self, item):
         # If a key doesn't already exist, warn the user and add default mapping
         if item not in self.keys():
-            print(f"ObservationKeyToModalityDict: {item} not found,"
-                  f" adding {item} to mapping with assumed low_dim modality!")
+            print(
+                f"ObservationKeyToModalityDict: {item} not found,"
+                f" adding {item} to mapping with assumed low_dim modality!"
+            )
             self.__setitem__(item, "low_dim")
         return super(ObservationKeyToModalityDict, self).__getitem__(item)
 
@@ -99,10 +118,16 @@ def obs_encoder_kwargs_from_config(obs_encoder_config):
     obs_encoder_config.unlock()
     for obs_modality, encoder_kwargs in obs_encoder_config.items():
         # Process core and randomizer kwargs
-        encoder_kwargs.core_kwargs = dict() if encoder_kwargs.core_kwargs is None else \
-            deepcopy(encoder_kwargs.core_kwargs)
-        encoder_kwargs.obs_randomizer_kwargs = dict() if encoder_kwargs.obs_randomizer_kwargs is None else \
-            deepcopy(encoder_kwargs.obs_randomizer_kwargs)
+        encoder_kwargs.core_kwargs = (
+            dict()
+            if encoder_kwargs.core_kwargs is None
+            else deepcopy(encoder_kwargs.core_kwargs)
+        )
+        encoder_kwargs.obs_randomizer_kwargs = (
+            dict()
+            if encoder_kwargs.obs_randomizer_kwargs is None
+            else deepcopy(encoder_kwargs.obs_randomizer_kwargs)
+        )
 
     # Re-lock keys
     obs_encoder_config.lock()
@@ -196,12 +221,16 @@ def initialize_obs_utils_with_obs_specs(obs_modality_specs):
                         OBS_KEYS_TO_MODALITIES[obs_key] = obs_modality
                     # otherwise, run sanity check to make sure we don't have conflicting, duplicate entries
                     else:
-                        assert OBS_KEYS_TO_MODALITIES[obs_key] == obs_modality, \
-                            f"Cannot register obs key {obs_key} with modality {obs_modality}; " \
+                        assert OBS_KEYS_TO_MODALITIES[obs_key] == obs_modality, (
+                            f"Cannot register obs key {obs_key} with modality {obs_modality}; "
                             f"already exists with corresponding modality {OBS_KEYS_TO_MODALITIES[obs_key]}"
+                        )
 
     # remove duplicate entries and store in global mapping
-    OBS_MODALITIES_TO_KEYS = { obs_modality : list(set(obs_modality_mapping[obs_modality])) for obs_modality in obs_modality_mapping }
+    OBS_MODALITIES_TO_KEYS = {
+        obs_modality: list(set(obs_modality_mapping[obs_modality]))
+        for obs_modality in obs_modality_mapping
+    }
 
     print("\n============= Initialized Observation Utils with Obs Spec =============\n")
     for obs_modality, obs_keys in OBS_MODALITIES_TO_KEYS.items():
@@ -231,14 +260,14 @@ def initialize_obs_utils_with_config(config):
     """
     if config.algo_name == "hbc":
         obs_modality_specs = [
-            config.observation.planner.modalities, 
+            config.observation.planner.modalities,
             config.observation.actor.modalities,
         ]
         obs_encoder_config = config.observation.actor.encoder
     elif config.algo_name == "iris":
         obs_modality_specs = [
-            config.observation.value_planner.planner.modalities, 
-            config.observation.value_planner.value.modalities, 
+            config.observation.value_planner.planner.modalities,
+            config.observation.value_planner.value.modalities,
             config.observation.actor.modalities,
         ]
         obs_encoder_config = config.observation.actor.encoder
@@ -257,7 +286,9 @@ def key_is_obs_modality(key, obs_modality):
         key (str): obs key name to check
         obs_modality (str): observation modality - e.g.: "low_dim", "rgb"
     """
-    assert OBS_KEYS_TO_MODALITIES is not None, "error: must call ObsUtils.initialize_obs_utils_with_obs_config first"
+    assert (
+        OBS_KEYS_TO_MODALITIES is not None
+    ), "error: must call ObsUtils.initialize_obs_utils_with_obs_config first"
     return OBS_KEYS_TO_MODALITIES[key] == obs_modality
 
 
@@ -273,11 +304,11 @@ def center_crop(im, t_h, t_w):
     Returns:
         im (np.array or torch.Tensor): center cropped image
     """
-    assert(im.shape[-3] >= t_h and im.shape[-2] >= t_w)
-    assert(im.shape[-1] in [1, 3])
+    assert im.shape[-3] >= t_h and im.shape[-2] >= t_w
+    assert im.shape[-1] in [1, 3]
     crop_h = int((im.shape[-3] - t_h) / 2)
     crop_w = int((im.shape[-2] - t_w) / 2)
-    return im[..., crop_h:crop_h + t_h, crop_w:crop_w + t_w, :]
+    return im[..., crop_h : crop_h + t_h, crop_w : crop_w + t_w, :]
 
 
 def batch_image_hwc_to_chw(im):
@@ -338,7 +369,9 @@ def process_obs(obs, obs_modality=None, obs_key=None):
     Returns:
         processed_obs (np.array or torch.Tensor): processed observation
     """
-    assert obs_modality is not None or obs_key is not None, "Either obs_modality or obs_key must be specified!"
+    assert (
+        obs_modality is not None or obs_key is not None
+    ), "Either obs_modality or obs_key must be specified!"
     if obs_key is not None:
         obs_modality = OBS_KEYS_TO_MODALITIES[obs_key]
     return OBS_MODALITY_CLASSES[obs_modality].process_obs(obs)
@@ -355,7 +388,9 @@ def process_obs_dict(obs_dict):
     Returns:
         new_dict (dict): dictionary where observation keys have been processed by their corresponding processors
     """
-    return { k : process_obs(obs=obs, obs_key=k) for k, obs in obs_dict.items() } # shallow copy
+    return {
+        k: process_obs(obs=obs, obs_key=k) for k, obs in obs_dict.items()
+    }  # shallow copy
 
 
 def process_frame(frame, channel_dim, scale):
@@ -373,7 +408,7 @@ def process_frame(frame, channel_dim, scale):
         processed_frame (np.array or torch.Tensor): processed frame
     """
     # Channel size should either be 3 (RGB) or 1 (depth)
-    assert (frame.shape[-1] == channel_dim)
+    assert frame.shape[-1] == channel_dim
     frame = TU.to_float(frame)
     if scale is not None:
         frame = frame / scale
@@ -400,7 +435,9 @@ def unprocess_obs(obs, obs_modality=None, obs_key=None):
     Returns:
         unprocessed_obs (np.array or torch.Tensor): unprocessed observation
     """
-    assert obs_modality is not None or obs_key is not None, "Either obs_modality or obs_key must be specified!"
+    assert (
+        obs_modality is not None or obs_key is not None
+    ), "Either obs_modality or obs_key must be specified!"
     if obs_key is not None:
         obs_modality = OBS_KEYS_TO_MODALITIES[obs_key]
     return OBS_MODALITY_CLASSES[obs_modality].unprocess_obs(obs)
@@ -419,7 +456,9 @@ def unprocess_obs_dict(obs_dict):
         new_dict (dict): dictionary where observation keys have been unprocessed by
             their respective unprocessor methods
     """
-    return { k : unprocess_obs(obs=obs, obs_key=k) for k, obs in obs_dict.items() } # shallow copy
+    return {
+        k: unprocess_obs(obs=obs, obs_key=k) for k, obs in obs_dict.items()
+    }  # shallow copy
 
 
 def unprocess_frame(frame, channel_dim, scale):
@@ -436,7 +475,7 @@ def unprocess_frame(frame, channel_dim, scale):
         unprocessed_frame (np.array or torch.Tensor): frame passed through
             inverse operation of @process_frame
     """
-    assert frame.shape[-3] == channel_dim # check for channel dimension
+    assert frame.shape[-3] == channel_dim  # check for channel dimension
     frame = batch_image_chw_to_hwc(frame)
     if scale is not None:
         frame = scale * frame
@@ -460,7 +499,7 @@ def get_processed_shape(obs_modality, input_shape):
 
 def normalize_dict(dict, normalization_stats):
     """
-    Normalize dict using the provided "offset" and "scale" entries 
+    Normalize dict using the provided "offset" and "scale" entries
     for each observation key. The dictionary will be
     modified in-place.
 
@@ -477,7 +516,9 @@ def normalize_dict(dict, normalization_stats):
     """
 
     # ensure we have statistics for each modality key in the dict
-    assert set(dict.keys()).issubset(normalization_stats), f"dict keys {list(dict.keys())} \
+    assert set(dict.keys()).issubset(
+        normalization_stats
+    ), f"dict keys {list(dict.keys())} \
          should be subset of normalization stats keys {list(normalization_stats.keys())}"
 
     for m in dict:
@@ -488,10 +529,12 @@ def normalize_dict(dict, normalization_stats):
         o_num_dims = len(offset.shape)
         shape_len_diff = len(offset.shape) - o_num_dims
         assert shape_len_diff >= 0, "shape length mismatch in @normalize_dict"
-        assert dict[m].shape[-o_num_dims:] == offset.shape, "shape mismatch in @normalize_obs"
+        assert (
+            dict[m].shape[-o_num_dims:] == offset.shape
+        ), "shape mismatch in @normalize_obs"
 
         # Obs can have one or more leading batch dims - prepare for broadcasting.
-        # 
+        #
         # As an example, if the obs has shape [B, T, D] and our offset / scale stats are shape [D]
         # then we should pad the stats to shape [1, 1, D].
         reshape_padding = tuple([1] * shape_len_diff)
@@ -505,7 +548,7 @@ def normalize_dict(dict, normalization_stats):
 
 def unnormalize_dict(dict, normalization_stats):
     """
-    Unnormalize dict using the provided "offset" and "scale" entries 
+    Unnormalize dict using the provided "offset" and "scale" entries
     for each observation key. The dictionary will be
     modified in-place.
 
@@ -532,7 +575,9 @@ def unnormalize_dict(dict, normalization_stats):
         shape_len_diff = len(offset.shape) - len(dict[m].shape)
         assert shape_len_diff in [0, 1], "shape length mismatch in @unnormalize_dict"
         # if dict has no leading batch dim, check shapes match exactly, else allow first dim to broadcast
-        assert offset.shape[1:] == dict[m].shape[(1 - shape_len_diff):], "shape mismatch in @unnormalize_dict"
+        assert (
+            offset.shape[1:] == dict[m].shape[(1 - shape_len_diff) :]
+        ), "shape mismatch in @unnormalize_dict"
 
         # handle case where obs dict is not batched by removing stats batch dimension
         if shape_len_diff == 1:
@@ -563,7 +608,7 @@ def repeat_and_stack_observation(obs_dict, n):
     Given an observation dictionary and a desired repeat value @n,
     this function will return a new observation dictionary where
     each modality is repeated @n times and the copies are
-    stacked in the first dimension. 
+    stacked in the first dimension.
 
     For example, if a batch of 3 observations comes in, and n is 2,
     the output will look like [ob1; ob1; ob2; ob2; ob3; ob3] in
@@ -583,7 +628,7 @@ def repeat_and_stack_observation(obs_dict, n):
 
 def crop_image_from_indices(images, crop_indices, crop_height, crop_width):
     """
-    Crops images at the locations specified by @crop_indices. Crops will be 
+    Crops images at the locations specified by @crop_indices. Crops will be
     taken across all channels.
 
     Args:
@@ -611,7 +656,9 @@ def crop_image_from_indices(images, crop_indices, crop_height, crop_width):
     assert crop_indices.shape[-1] == 2
     ndim_im_shape = len(images.shape)
     ndim_indices_shape = len(crop_indices.shape)
-    assert (ndim_im_shape == ndim_indices_shape + 1) or (ndim_im_shape == ndim_indices_shape + 2)
+    assert (ndim_im_shape == ndim_indices_shape + 1) or (
+        ndim_im_shape == ndim_indices_shape + 2
+    )
 
     # maybe pad so that @crop_indices is shape [..., N, 2]
     is_padded = False
@@ -641,20 +688,30 @@ def crop_image_from_indices(images, crop_indices, crop_height, crop_width):
     crop_ind_grid_w = torch.arange(crop_width).to(device)
     crop_ind_grid_w = TU.unsqueeze_expand_at(crop_ind_grid_w, size=crop_height, dim=0)
     # combine into shape [CH, CW, 2]
-    crop_in_grid = torch.cat((crop_ind_grid_h.unsqueeze(-1), crop_ind_grid_w.unsqueeze(-1)), dim=-1)
+    crop_in_grid = torch.cat(
+        (crop_ind_grid_h.unsqueeze(-1), crop_ind_grid_w.unsqueeze(-1)), dim=-1
+    )
 
     # Add above grid with the offset index of each sampled crop to get 2d indices for each crop.
     # After broadcasting, this will be shape [..., N, CH, CW, 2] and each crop has a [CH, CW, 2]
     # shape array that tells us which pixels from the corresponding source image to grab.
     grid_reshape = [1] * len(crop_indices.shape[:-1]) + [crop_height, crop_width, 2]
-    all_crop_inds = crop_indices.unsqueeze(-2).unsqueeze(-2) + crop_in_grid.reshape(grid_reshape)
+    all_crop_inds = crop_indices.unsqueeze(-2).unsqueeze(-2) + crop_in_grid.reshape(
+        grid_reshape
+    )
 
     # For using @torch.gather, convert to flat indices from 2D indices, and also
-    # repeat across the channel dimension. To get flat index of each pixel to grab for 
+    # repeat across the channel dimension. To get flat index of each pixel to grab for
     # each sampled crop, we just use the mapping: ind = h_ind * @image_w + w_ind
-    all_crop_inds = all_crop_inds[..., 0] * image_w + all_crop_inds[..., 1] # shape [..., N, CH, CW]
-    all_crop_inds = TU.unsqueeze_expand_at(all_crop_inds, size=image_c, dim=-3) # shape [..., N, C, CH, CW]
-    all_crop_inds = TU.flatten(all_crop_inds, begin_axis=-2) # shape [..., N, C, CH * CW]
+    all_crop_inds = (
+        all_crop_inds[..., 0] * image_w + all_crop_inds[..., 1]
+    )  # shape [..., N, CH, CW]
+    all_crop_inds = TU.unsqueeze_expand_at(
+        all_crop_inds, size=image_c, dim=-3
+    )  # shape [..., N, C, CH, CW]
+    all_crop_inds = TU.flatten(
+        all_crop_inds, begin_axis=-2
+    )  # shape [..., N, C, CH * CW]
 
     # Repeat and flatten the source images -> [..., N, C, H * W] and then use gather to index with crop pixel inds
     images_to_crop = TU.unsqueeze_expand_at(images, size=num_crops, dim=-4)
@@ -662,8 +719,12 @@ def crop_image_from_indices(images, crop_indices, crop_height, crop_width):
     crops = torch.gather(images_to_crop, dim=-1, index=all_crop_inds)
     # [..., N, C, CH * CW] -> [..., N, C, CH, CW]
     reshape_axis = len(crops.shape) - 1
-    crops = TU.reshape_dimensions(crops, begin_axis=reshape_axis, end_axis=reshape_axis, 
-                    target_dims=(crop_height, crop_width))
+    crops = TU.reshape_dimensions(
+        crops,
+        begin_axis=reshape_axis,
+        end_axis=reshape_axis,
+        target_dims=(crop_height, crop_width),
+    )
 
     if is_padded:
         # undo padding -> [..., C, CH, CW]
@@ -671,7 +732,9 @@ def crop_image_from_indices(images, crop_indices, crop_height, crop_width):
     return crops
 
 
-def sample_random_image_crops(images, crop_height, crop_width, num_crops, pos_enc=False):
+def sample_random_image_crops(
+    images, crop_height, crop_width, num_crops, pos_enc=False
+):
     """
     For each image, randomly sample @num_crops crops of size (@crop_height, @crop_width), from
     @images.
@@ -680,18 +743,18 @@ def sample_random_image_crops(images, crop_height, crop_width, num_crops, pos_en
         images (torch.Tensor): batch of images of shape [..., C, H, W]
 
         crop_height (int): height of crop to take
-        
+
         crop_width (int): width of crop to take
 
         num_crops (n): number of crops to sample
 
-        pos_enc (bool): if True, also add 2 channels to the outputs that gives a spatial 
+        pos_enc (bool): if True, also add 2 channels to the outputs that gives a spatial
             encoding of the original source pixel locations. This means that the
-            output crops will contain information about where in the source image 
+            output crops will contain information about where in the source image
             it was sampled from.
 
     Returns:
-        crops (torch.Tensor): crops of shape (..., @num_crops, C, @crop_height, @crop_width) 
+        crops (torch.Tensor): crops of shape (..., @num_crops, C, @crop_height, @crop_width)
             if @pos_enc is False, otherwise (..., @num_crops, C + 2, @crop_height, @crop_width)
 
         crop_inds (torch.Tensor): sampled crop indices of shape (..., N, 2)
@@ -706,7 +769,7 @@ def sample_random_image_crops(images, crop_height, crop_width, num_crops, pos_en
         pos_y, pos_x = torch.meshgrid(torch.arange(h), torch.arange(w))
         pos_y = pos_y.float().to(device) / float(h)
         pos_x = pos_x.float().to(device) / float(w)
-        position_enc = torch.stack((pos_y, pos_x)) # shape [C, H, W]
+        position_enc = torch.stack((pos_y, pos_x))  # shape [C, H, W]
 
         # unsqueeze and expand to match leading dimensions -> shape [..., C, H, W]
         leading_shape = source_im.shape[:-3]
@@ -722,20 +785,26 @@ def sample_random_image_crops(images, crop_height, crop_width, num_crops, pos_en
     max_sample_w = image_w - crop_width
 
     # Sample crop locations for all tensor dimensions up to the last 3, which are [C, H, W].
-    # Each gets @num_crops samples - typically this will just be the batch dimension (B), so 
+    # Each gets @num_crops samples - typically this will just be the batch dimension (B), so
     # we will sample [B, N] indices, but this supports having more than one leading dimension,
     # or possibly no leading dimension.
     #
     # Trick: sample in [0, 1) with rand, then re-scale to [0, M) and convert to long to get sampled ints
-    crop_inds_h = (max_sample_h * torch.rand(*source_im.shape[:-3], num_crops).to(device)).long()
-    crop_inds_w = (max_sample_w * torch.rand(*source_im.shape[:-3], num_crops).to(device)).long()
-    crop_inds = torch.cat((crop_inds_h.unsqueeze(-1), crop_inds_w.unsqueeze(-1)), dim=-1) # shape [..., N, 2]
+    crop_inds_h = (
+        max_sample_h * torch.rand(*source_im.shape[:-3], num_crops).to(device)
+    ).long()
+    crop_inds_w = (
+        max_sample_w * torch.rand(*source_im.shape[:-3], num_crops).to(device)
+    ).long()
+    crop_inds = torch.cat(
+        (crop_inds_h.unsqueeze(-1), crop_inds_w.unsqueeze(-1)), dim=-1
+    )  # shape [..., N, 2]
 
     crops = crop_image_from_indices(
-        images=source_im, 
-        crop_indices=crop_inds, 
-        crop_height=crop_height, 
-        crop_width=crop_width, 
+        images=source_im,
+        crop_indices=crop_inds,
+        crop_height=crop_height,
+        crop_width=crop_width,
     )
 
     return crops, crop_inds
@@ -746,6 +815,7 @@ class Modality:
     Observation Modality class to encapsulate necessary functions needed to
     process observations of this modality
     """
+
     # observation keys to associate with this modality
     keys = set()
 
@@ -762,7 +832,9 @@ class Modality:
         """
         Hook method to automatically register all valid subclasses so we can keep track of valid modalities
         """
-        assert cls.name is not None, f"Name of modality {cls.__name__} must be specified!"
+        assert (
+            cls.name is not None
+        ), f"Name of modality {cls.__name__} must be specified!"
         register_obs_key(cls)
 
     @classmethod
@@ -857,8 +929,11 @@ class Modality:
         Returns:
             np.array or torch.Tensor: processed observation
         """
-        processor = cls._custom_obs_processor if \
-            cls._custom_obs_processor is not None else cls._default_obs_processor
+        processor = (
+            cls._custom_obs_processor
+            if cls._custom_obs_processor is not None
+            else cls._default_obs_processor
+        )
         return processor(obs)
 
     @classmethod
@@ -872,8 +947,11 @@ class Modality:
         Returns:
             np.array or torch.Tensor: unprocessed observation
         """
-        unprocessor = cls._custom_obs_unprocessor if \
-            cls._custom_obs_unprocessor is not None else cls._default_obs_unprocessor
+        unprocessor = (
+            cls._custom_obs_unprocessor
+            if cls._custom_obs_unprocessor is not None
+            else cls._default_obs_unprocessor
+        )
         return unprocessor(obs)
 
     @classmethod
@@ -903,6 +981,7 @@ class ImageModality(Modality):
     """
     Modality for RGB image observations
     """
+
     name = "rgb"
 
     @classmethod
@@ -918,7 +997,7 @@ class ImageModality(Modality):
         Returns:
             processed_obs (np.array or torch.Tensor): processed image
         """
-        return process_frame(frame=obs, channel_dim=3, scale=255.)
+        return process_frame(frame=obs, channel_dim=3, scale=255.0)
 
     @classmethod
     def _default_obs_unprocessor(cls, obs):
@@ -933,13 +1012,14 @@ class ImageModality(Modality):
             unprocessed_obs (np.array or torch.Tensor): image passed through
                 inverse operation of @process_frame
         """
-        return TU.to_uint8(unprocess_frame(frame=obs, channel_dim=3, scale=255.))
+        return TU.to_uint8(unprocess_frame(frame=obs, channel_dim=3, scale=255.0))
 
 
 class DepthModality(Modality):
     """
     Modality for depth observations
     """
+
     name = "depth"
 
     @classmethod
@@ -955,7 +1035,7 @@ class DepthModality(Modality):
         Returns:
             processed_obs (np.array or torch.Tensor): processed depth
         """
-        return process_frame(frame=obs, channel_dim=1, scale=1.)
+        return process_frame(frame=obs, channel_dim=1, scale=1.0)
 
     @classmethod
     def _default_obs_unprocessor(cls, obs):
@@ -970,27 +1050,28 @@ class DepthModality(Modality):
             unprocessed_obs (np.array or torch.Tensor): depth passed through
                 inverse operation of @process_depth
         """
-        return unprocess_frame(frame=obs, channel_dim=1, scale=1.)
+        return unprocess_frame(frame=obs, channel_dim=1, scale=1.0)
 
 
 class ScanModality(Modality):
     """
     Modality for scan observations
     """
+
     name = "scan"
 
     @classmethod
     def _default_obs_processor(cls, obs):
         # Channel swaps ([...,] L, C) --> ([...,] C, L)
-        
+
         # First, add extra dimension at 2nd to last index to treat this as a frame
         shape = obs.shape
         new_shape = [*shape[:-2], 1, *shape[-2:]]
         obs = obs.reshape(new_shape)
-        
+
         # Convert shape
         obs = batch_image_hwc_to_chw(obs)
-        
+
         # Remove extra dimension (it's the second from last dimension)
         obs = obs.squeeze(-2)
         return obs
@@ -998,7 +1079,7 @@ class ScanModality(Modality):
     @classmethod
     def _default_obs_unprocessor(cls, obs):
         # Channel swaps ([B,] C, L) --> ([B,] L, C)
-        
+
         # First, add extra dimension at 1st index to treat this as a frame
         shape = obs.shape
         new_shape = [*shape[:-2], 1, *shape[-2:]]
@@ -1016,6 +1097,7 @@ class LowDimModality(Modality):
     """
     Modality for low dimensional observations
     """
+
     name = "low_dim"
 
     @classmethod

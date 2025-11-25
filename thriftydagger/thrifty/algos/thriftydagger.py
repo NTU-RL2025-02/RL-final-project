@@ -177,6 +177,8 @@ def generate_offline_data(
     act_limit = env.action_space.high[0]
     while i < num_episodes:
         print("Episode #{}".format(i))
+        expert_policy.start_episode()
+        suboptimal_policy.start_episode()
         o, total_ret, d, t = env.reset(), 0, False, 0
         curr_obs, curr_act = [], []
         if robosuite:
@@ -212,8 +214,6 @@ def generate_offline_data(
     print("Ep Mean, Std Dev:", np.array(rew).mean(), np.array(rew).std())
     print("Num Successes {} Num Failures {}".format(num_episodes, failures))
     pickle.dump({"obs": np.stack(obs), "act": np.stack(act)}, open(output_file, "wb"))
-
-
 
 
 def thrifty(
@@ -256,8 +256,6 @@ def thrifty(
     num_test_episodes: run this many episodes after each iter without interventions
     init_model: initial NN weights
     """
-    
-
 
     logger = EpochLogger(**logger_kwargs)
     _locals = locals()
@@ -385,6 +383,8 @@ def thrifty(
         """Run test episodes"""
         obs, act, done, rew = [], [], [], []
         for j in range(num_test_episodes):
+            expert_policy.start_episode()
+            suboptimal_policy.start_episode()
             o, d, ep_ret, ep_ret2, ep_len = env.reset(), False, 0, 0, 0
             while not d:
                 obs.append(o)
@@ -486,6 +486,8 @@ def thrifty(
         if t == 0:  # skip data collection on iter 0 to train Q
             i = obs_per_iter
         while i < obs_per_iter:
+            expert_policy.start_episode()
+            suboptimal_policy.start_episode()
             o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
             if robosuite:
                 robosuite_cfg["INPUT_DEVICE"].start_control()
@@ -509,7 +511,9 @@ def thrifty(
                     estimates.append(ac.variance(o))
                     estimates2.append(ac.safety(o, a))
                 if expert_mode:
-                    a_expert = expert_policy(extra_obs_extractor(env, env.env.env.latest_obs_dict))
+                    a_expert = expert_policy(
+                        extra_obs_extractor(env, env.env.env.latest_obs_dict)
+                    )
                     a_expert = np.clip(a_expert, -act_limit, act_limit)
                     replay_buffer.store(o, a_expert)
                     online_burden += 1
@@ -530,8 +534,12 @@ def thrifty(
                     s = env._check_success()
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
                 elif safety_mode:
-                    a_suboptimal_policy = suboptimal_policy(extra_obs_extractor(env, env.env.env.latest_obs_dict))
-                    a_suboptimal_policy = np.clip(a_suboptimal_policy, -act_limit, act_limit)
+                    a_suboptimal_policy = suboptimal_policy(
+                        extra_obs_extractor(env, env.env.env.latest_obs_dict)
+                    )
+                    a_suboptimal_policy = np.clip(
+                        a_suboptimal_policy, -act_limit, act_limit
+                    )
                     replay_buffer.store(o, a_suboptimal_policy)
                     risk.append(ac.safety(o, a_suboptimal_policy))
                     if (hg_dagger and a_suboptimal_policy[3] != 0) or (
@@ -548,7 +556,9 @@ def thrifty(
                     act.append(a_suboptimal_policy)
                     sup.append(1)
                     s = env._check_success()
-                    qbuffer.store(o, a_suboptimal_policy, o2, int(s), (ep_len + 1 >= horizon) or s)
+                    qbuffer.store(
+                        o, a_suboptimal_policy, o2, int(s), (ep_len + 1 >= horizon) or s
+                    )
                 # hg-dagger switching for hg-dagger, or novelty switching for thriftydagger
                 elif (hg_dagger and hg_dagger()) or (
                     not hg_dagger and ac.variance(o) > switch2human_thresh

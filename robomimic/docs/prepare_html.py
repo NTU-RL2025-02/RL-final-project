@@ -1,6 +1,6 @@
 """
-This script renames the "_static" and "_sources" folders to "static" and "sources" 
-respectively in the HTML build directory, and updates all referencesin the HTML 
+This script renames the "_static" and "_sources" folders to "static" and "sources"
+respectively in the HTML build directory, and updates all referencesin the HTML
 files to point to the new folder name.
 """
 

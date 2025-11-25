@@ -1,7 +1,7 @@
 """
 Helper script to convert D4RL data into an hdf5 compatible with this repository.
 Takes a folder path and a D4RL env name. This script downloads the corresponding
-raw D4RL dataset into a "d4rl" subfolder, and then makes a converted dataset 
+raw D4RL dataset into a "d4rl" subfolder, and then makes a converted dataset
 in the "d4rl/converted" subfolder.
 
 This script has been tested on the follwing commits:
@@ -12,7 +12,7 @@ This script has been tested on the follwing commits:
 Args:
     env (str): d4rl env name, which specifies the dataset to download and convert
     folder (str): specify folder to download raw d4rl datasets and converted d4rl datasets to.
-        A `d4rl` subfolder will be created in this folder with the raw d4rl dataset, and 
+        A `d4rl` subfolder will be created in this folder with the raw d4rl dataset, and
         a `d4rl/converted` subfolder will be created in this folder with the converted
         datasets (if they do not already exist). Defaults to the datasets folder at
         the top-level of the repository.
@@ -75,24 +75,26 @@ if __name__ == "__main__":
     write_folder = os.path.join(base_folder, "converted")
     if not os.path.exists(write_folder):
         os.makedirs(write_folder)
-    output_path = os.path.join(base_folder, "converted", "{}.hdf5".format(args.env.replace("-", "_")))
+    output_path = os.path.join(
+        base_folder, "converted", "{}.hdf5".format(args.env.replace("-", "_"))
+    )
     f_sars = h5py.File(output_path, "w")
     f_sars_grp = f_sars.create_group("data")
 
     # code to split D4RL data into trajectories
     # (modified from https://github.com/aviralkumar2907/d4rl_evaluations/blob/bear_intergrate/bear/examples/bear_hdf5_d4rl.py#L18)
-    all_obs = ds['observations']
-    all_act = ds['actions']
+    all_obs = ds["observations"]
+    all_act = ds["actions"]
     N = all_obs.shape[0]
 
-    obs = all_obs[:N-1]
-    actions = all_act[:N-1]
+    obs = all_obs[: N - 1]
+    actions = all_act[: N - 1]
     next_obs = all_obs[1:]
-    rewards = np.squeeze(ds['rewards'][:N-1])
-    dones = np.squeeze(ds['terminals'][:N-1]).astype(np.int32)
+    rewards = np.squeeze(ds["rewards"][: N - 1])
+    dones = np.squeeze(ds["terminals"][: N - 1]).astype(np.int32)
 
-    assert 'timeouts' in ds
-    timeouts = ds['timeouts'][:]
+    assert "timeouts" in ds
+    timeouts = ds["timeouts"][:]
 
     ctr = 0
     total_samples = 0
@@ -132,12 +134,19 @@ if __name__ == "__main__":
             ctr = 0
             traj = dict(obs=[], next_obs=[], actions=[], rewards=[], dones=[])
 
-    print("\nExcluding {} samples at end of file due to no trajectory truncation.".format(len(traj["actions"])))
-    print("Wrote {} trajectories to new converted hdf5 at {}\n".format(num_traj, output_path))
+    print(
+        "\nExcluding {} samples at end of file due to no trajectory truncation.".format(
+            len(traj["actions"])
+        )
+    )
+    print(
+        "Wrote {} trajectories to new converted hdf5 at {}\n".format(
+            num_traj, output_path
+        )
+    )
 
     # metadata
     f_sars_grp.attrs["total"] = total_samples
     f_sars_grp.attrs["env_args"] = json.dumps(env.serialize(), indent=4)
 
     f_sars.close()
-

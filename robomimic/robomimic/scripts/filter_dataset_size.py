@@ -12,12 +12,19 @@ import numpy as np
 from robomimic.utils.file_utils import create_hdf5_filter_key
 
 
-def filter_dataset_size(hdf5_path, num_demos, input_filter_key=None, output_filter_key=None):
+def filter_dataset_size(
+    hdf5_path, num_demos, input_filter_key=None, output_filter_key=None
+):
     # retrieve number of demos
     f = h5py.File(hdf5_path, "r")
     if input_filter_key is not None:
         print("using filter key: {}".format(input_filter_key))
-        demos = sorted([elem.decode("utf-8") for elem in np.array(f["mask/{}".format(input_filter_key)])])
+        demos = sorted(
+            [
+                elem.decode("utf-8")
+                for elem in np.array(f["mask/{}".format(input_filter_key)])
+            ]
+        )
     else:
         demos = sorted(list(f["data"].keys()))
     f.close()
@@ -25,7 +32,7 @@ def filter_dataset_size(hdf5_path, num_demos, input_filter_key=None, output_filt
     # get random split
     total_num_demos = len(demos)
     mask = np.zeros(total_num_demos)
-    mask[:num_demos] = 1.
+    mask[:num_demos] = 1.0
     np.random.shuffle(mask)
     mask = mask.astype(int)
     subset_inds = mask.nonzero()[0]
@@ -40,7 +47,9 @@ def filter_dataset_size(hdf5_path, num_demos, input_filter_key=None, output_filt
     if input_filter_key is not None:
         name = "{}_{}".format(input_filter_key, name)
 
-    subset_lengths = create_hdf5_filter_key(hdf5_path=hdf5_path, demo_keys=subset_keys, key_name=name)
+    subset_lengths = create_hdf5_filter_key(
+        hdf5_path=hdf5_path, demo_keys=subset_keys, key_name=name
+    )
 
     print("Total number of subset samples: {}".format(np.sum(subset_lengths)))
     print("Average number of subset samples {}".format(np.mean(subset_lengths)))
@@ -65,14 +74,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_demos",
         type=int,
-        nargs='+',
+        nargs="+",
         required=True,
     )
     parser.add_argument(
         "--output_filter_key",
         type=str,
         required=False,
-        help="(optional) use custom name for output filter key name"
+        help="(optional) use custom name for output filter key name",
     )
     args = parser.parse_args()
 

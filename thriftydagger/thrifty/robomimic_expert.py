@@ -85,10 +85,7 @@ class RobomimicExpert:
             obj = obj[..., :14]
 
         if not (
-            eef_pos.shape[0]
-            == eef_quat.shape[0]
-            == gripper.shape[0]
-            == obj.shape[0]
+            eef_pos.shape[0] == eef_quat.shape[0] == gripper.shape[0] == obj.shape[0]
         ):
             raise ValueError(
                 "RobomimicExpert could not align batch dims: "
@@ -116,7 +113,9 @@ class RobomimicExpert:
         # Try to use the raw observation dictionary from the caching wrapper
         # This is more reliable than trying to decompose the flattened observation
         if obs.shape[-1] != 23:
-            if self.env_wrapper is not None and hasattr(self.env_wrapper, "latest_obs_dict"):
+            if self.env_wrapper is not None and hasattr(
+                self.env_wrapper, "latest_obs_dict"
+            ):
                 source_dict = self.env_wrapper.latest_obs_dict
                 obs = self._flatten_obs_dict(source_dict)
             else:
@@ -125,11 +124,10 @@ class RobomimicExpert:
                     "could not retrieve raw observation dict from environment wrapper"
                 )
 
-
-        obj = obs[0, 0:14]  
-        eef_pos      = obs[0, 14:17]     # (3,)
-        eef_quat     = obs[0, 17:21]     # (4,)
-        gripper_qpos = obs[0, 21:23]     # (2,)
+        obj = obs[0, 0:14]
+        eef_pos = obs[0, 14:17]  # (3,)
+        eef_quat = obs[0, 17:21]  # (4,)
+        gripper_qpos = obs[0, 21:23]  # (2,)
 
         # robomimic expects this flat structure (not nested under "obs")
         obs_dict = {

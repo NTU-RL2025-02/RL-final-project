@@ -1,6 +1,7 @@
 """
 This file contains some PyTorch utilities.
 """
+
 import numpy as np
 import math
 import torch
@@ -18,9 +19,7 @@ def soft_update(source, target, tau):
         target (torch.nn.Module): target network to update
     """
     for target_param, param in zip(target.parameters(), source.parameters()):
-        target_param.copy_(
-            target_param * (1.0 - tau) + param * tau
-        )
+        target_param.copy_(target_param * (1.0 - tau) + param * tau)
 
 
 def hard_update(source, target):
@@ -32,7 +31,7 @@ def hard_update(source, target):
         target (torch.nn.Module): target network to update parameters for
     """
     for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.copy_(param)
+        target_param.copy_(param)
 
 
 def get_torch_device(try_to_use_cuda):
@@ -90,7 +89,7 @@ def reparameterize(mu, logvar):
 
 def optimizer_from_optim_params(net_optim_params, net):
     """
-    Helper function to return a torch Optimizer from the optim_params 
+    Helper function to return a torch Optimizer from the optim_params
     section of the config for a particular network.
 
     Args:
@@ -122,7 +121,7 @@ def optimizer_from_optim_params(net_optim_params, net):
 
 def lr_scheduler_from_optim_params(net_optim_params, net, optimizer):
     """
-    Helper function to return a LRScheduler from the optim_params 
+    Helper function to return a LRScheduler from the optim_params
     section of the config for a particular network. Returns None
     if a scheduler is not needed.
 
@@ -138,7 +137,9 @@ def lr_scheduler_from_optim_params(net_optim_params, net, optimizer):
     Returns:
         lr_scheduler (torch.optim.lr_scheduler or None): learning rate scheduler
     """
-    lr_scheduler_type = net_optim_params["learning_rate"].get("scheduler_type", "multistep")
+    lr_scheduler_type = net_optim_params["learning_rate"].get(
+        "scheduler_type", "multistep"
+    )
     num_train_batches = net_optim_params["num_train_batches"]
     num_epochs = net_optim_params["num_epochs"]
 
@@ -148,7 +149,7 @@ def lr_scheduler_from_optim_params(net_optim_params, net, optimizer):
         if len(epoch_schedule) > 0:
             assert len(epoch_schedule) == 1
             end_epoch = epoch_schedule[0]
-            
+
             return optim.lr_scheduler.LinearLR(
                 optimizer,
                 start_factor=1.0,
@@ -168,17 +169,26 @@ def lr_scheduler_from_optim_params(net_optim_params, net, optimizer):
         # source: https://github.com/huggingface/diffusers/blob/ee7e141d805b0d87ad207872060ae1f15ce65943/src/diffusers/optimization.py#L154
         num_warmup_steps = net_optim_params["learning_rate"].get("warmup_steps", 0)
         num_training_steps = num_train_batches * num_epochs
-        num_cycles = net_optim_params["learning_rate"].get("num_cycles", 0.5) # number of cosine cycles (0 to 2pi) in the LR schedule, default to half-cycle 
+        num_cycles = net_optim_params["learning_rate"].get(
+            "num_cycles", 0.5
+        )  # number of cosine cycles (0 to 2pi) in the LR schedule, default to half-cycle
+
         def lr_lambda(current_step):
             if current_step < num_warmup_steps:
                 return float(current_step) / float(max(1, num_warmup_steps))
-            progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
-            return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+            progress = float(current_step - num_warmup_steps) / float(
+                max(1, num_training_steps - num_warmup_steps)
+            )
+            return max(
+                0.0,
+                0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)),
+            )
+
         return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     else:
         raise ValueError("Invalid LR scheduler type: {}".format(lr_scheduler_type))
-        
+
     return lr_scheduler
 
 
@@ -259,7 +269,7 @@ def backprop_for_loss(net, optim, loss, max_grad_norm=None, retain_graph=False):
         torch.nn.utils.clip_grad_norm_(net.parameters(), max_grad_norm)
 
     # compute grad norms
-    grad_norms = 0.
+    grad_norms = 0.0
     for p in net.parameters():
         # only clip gradients for parameters for which requires_grad is True
         if p.grad is not None:
@@ -307,13 +317,15 @@ def euler_angles_to_rot_6d(euler_angles, convention="XYZ"):
     return rot_6d
 
 
-class dummy_context_mgr():
+class dummy_context_mgr:
     """
     A dummy context manager - useful for having conditional scopes (such
     as @maybe_no_grad). Nothing happens in this scope.
     """
+
     def __enter__(self):
         return None
+
     def __exit__(self, exc_type, exc_value, traceback):
         return False
 
@@ -331,6 +343,8 @@ def maybe_no_grad(no_grad):
 The following utility functions were taken from PyTorch3D:
 https://github.com/facebookresearch/pytorch3d/blob/d84f274a0822da969668d00e831870fd88327845/pytorch3d/transforms/rotation_conversions.py
 """
+
+
 def _sqrt_positive_part(x: torch.Tensor) -> torch.Tensor:
     """
     Returns torch.sqrt(torch.max(0, x))

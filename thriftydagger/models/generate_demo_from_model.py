@@ -8,11 +8,13 @@ from robomimic.algo import algo_factory
 from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoint
 from thrifty.robomimic_expert import RobomimicExpert
 
+
 class ObsCachingWrapper:
     """
     Lightweight wrapper that caches raw robosuite dict observations.
     Not a Gymnasium wrapper because the base robosuite env is not a Gym Env.
     """
+
     def __init__(self, env):
         self.env = env
         self.latest_obs_dict = None
@@ -34,6 +36,8 @@ class ObsCachingWrapper:
 
     def __getattr__(self, name):
         return getattr(self.env, name)
+
+
 class CustomWrapper(gym.Env):
     def __init__(self, env, render):
         self.env = env
@@ -57,7 +61,7 @@ class CustomWrapper(gym.Env):
         return result
 
     def reset(self):
-        res = self.env.reset()      # o ?O obs ?V?q (23,)
+        res = self.env.reset()  # o ?O obs ?V?q (23,)
         o = res[0] if isinstance(res, tuple) else res
         self.render()
         settle_action = np.zeros(7)
@@ -95,27 +99,33 @@ class CustomWrapper(gym.Env):
         if self._render:
             self.env.render()
 
-lang_emb = np.load('models/lang_emb.npy')
+
+lang_emb = np.load("models/lang_emb.npy")
+
 
 def get_observation(env, di):
     """
     Get current environment observation dictionary.
 
     Args:
-        di (dict): current raw observation dictionary from robosuite to wrap and provide 
+        di (dict): current raw observation dictionary from robosuite to wrap and provide
             as a dictionary. If not provided, will be queried from robosuite.
     """
     ret = {}
     for k in di:
-        if (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(key=k, obs_modality="rgb"):
+        if (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(
+            key=k, obs_modality="rgb"
+        ):
             # by default images from mujoco are flipped in height
             ret[k] = di[k][::-1].copy()
-        elif (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(key=k, obs_modality="depth"):
+        elif (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(
+            key=k, obs_modality="depth"
+        ):
             # by default depth images from mujoco are flipped in height
             ret[k] = di[k][::-1].copy()
             if len(ret[k].shape) == 2:
-                ret[k] = ret[k][..., None] # (H, W, 1)
-            assert len(ret[k].shape) == 3 
+                ret[k] = ret[k][..., None]  # (H, W, 1)
+            assert len(ret[k].shape) == 3
             # scale entries in depth map to correspond to real distance.
             ret[k] = get_real_depth_map(ret[k])
 
@@ -128,8 +138,11 @@ def get_observation(env, di):
         # ensures that we don't accidentally add robot wrist images a second time
         pf = robot.robot_model.naming_prefix
         for k in di:
-            if k.startswith(pf) and (k not in ret) and \
-                    (not k.endswith("proprio-state")):
+            if (
+                k.startswith(pf)
+                and (k not in ret)
+                and (not k.endswith("proprio-state"))
+            ):
                 ret[k] = np.array(di[k])
 
     ret[LangUtils.LANG_EMB_OBS_KEY] = np.array(lang_emb)
@@ -181,9 +194,9 @@ env = suite.make(
     hard_reset=True,
     use_object_obs=True,
 )
-obs_cacher = ObsCachingWrapper(env) 
-env = GymWrapper(  
-    obs_cacher,     
+obs_cacher = ObsCachingWrapper(env)
+env = GymWrapper(
+    obs_cacher,
     keys=[
         "robot0_eef_pos",
         "robot0_eef_quat",
@@ -191,8 +204,8 @@ env = GymWrapper(
         "object",
     ],
 )
-env = VisualizationWrapper(env, indicator_configs=None) 
-env = CustomWrapper(env, render=False) 
+env = VisualizationWrapper(env, indicator_configs=None)
+env = CustomWrapper(env, render=False)
 
 
 # model_name = "model_epoch_2000_low_dim_v15_success_0.5"
@@ -205,37 +218,40 @@ env = CustomWrapper(env, render=False)
 model_name = "model_epoch_2000_low_dim_v15_success_0.5"
 ckpt = f"models/{model_name}.pth"
 env_ref, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
-policy, _ = policy_from_checkpoint(ckpt_dict=ckpt_dict)
+policy, _ = policy_from_checkpoint(device="cuda", ckpt_dict=ckpt_dict)
 
 obs_list, act_list = [], []
 ep = 1
 while ep <= 10:
     ep_obs, ep_act = [], []
-    policy.start_episode() # important
+    policy.start_episode()  # important
     o, done = env.reset(), False
     # o_ref, done_ref = env_ref.reset(), False
     step = 0
-    while not done and len(ep_obs) < 250:
-        a = policy(get_observation(env, env.env.env.latest_obs_dict)) #important
+    while not done and len(ep_obs) < 300:
+        a = policy(get_observation(env, env.env.observation_spec()))  # important
         ep_obs.append(o)
         ep_act.append(a)
         o, r, sys_done, info = env.step(a)
         done = env._check_success()
-        
+
         # a_ref = policy(o_ref)
         # o_ref, r, sys_done, info = env_ref.step(a_ref)
         # done_ref = env_ref.is_success()['task']
         # step += 1
         # print(step)
-        # print(all(get_observation(env, env.env.env.latest_obs_dict)) ==  all(o_ref))
+        # print(all(get_observation(env, env.env.observation_spec())) ==  all(o_ref))
         # print(all(a) == all(a_ref))
         # print(done == done_ref)
-    print(f'{ep}: done={done}, episode length={len(ep_obs)}')
+    print(f"{ep}: done={done}, episode length={len(ep_obs)}")
     if done:
         ep += 1
         obs_list.extend(ep_obs)
         act_list.extend(ep_act)
-pickle.dump({"obs": np.array(obs_list), "act": np.array(act_list)}, open(f"models/{model_name}-30.pkl", "wb"))
+pickle.dump(
+    {"obs": np.array(obs_list), "act": np.array(act_list)},
+    open(f"models/{model_name}-30.pkl", "wb"),
+)
 
 # ep = 1
 # while ep <= 300:
