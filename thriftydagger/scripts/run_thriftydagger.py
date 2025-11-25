@@ -329,7 +329,7 @@ if __name__ == "__main__":
             target_rate=args.targetrate,
             seed=args.seed,
             expert_policy=expert_pol,
-            input_file="rollout.pkl",
+            input_file="models/model_epoch_2000_low_dim_v15_success_0.5-30.pkl",
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
             q_learning=True,
