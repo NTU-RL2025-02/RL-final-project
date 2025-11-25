@@ -10,7 +10,7 @@ from robomimic.config import config_factory
 class RobomimicExpert:
     """
     Load a robomimic checkpoint and expose an expert_policy(obs) interface for ThriftyDAgger.
-    Expected obs dim: 23 = [ robot0_eef_pos(3), robot0_eef_quat(4), robot0_gripper_qpos(2), object(14) ]
+    Expected obs dim: 23 = [ robot0_eef_pos(3), robot0_eef_quat(4), robot0_gripper_qpos(2), object(14) ] 但不一定是這樣！！！
     """
 
     def __init__(self, ckpt_path, device="cuda"):
