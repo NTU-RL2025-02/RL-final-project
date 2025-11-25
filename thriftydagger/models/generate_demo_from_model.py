@@ -205,7 +205,7 @@ env = CustomWrapper(env, render=False)
 model_name = "model_epoch_2000_low_dim_v15_success_0.5"
 ckpt = f"models/{model_name}.pth"
 env_ref, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
-policy, _ = policy_from_checkpoint(ckpt_dict=ckpt_dict)
+policy, _ = policy_from_checkpoint(device='cuda', ckpt_dict=ckpt_dict)
 
 obs_list, act_list = [], []
 ep = 1
@@ -215,8 +215,8 @@ while ep <= 10:
     o, done = env.reset(), False
     # o_ref, done_ref = env_ref.reset(), False
     step = 0
-    while not done and len(ep_obs) < 250:
-        a = policy(get_observation(env, env.env.env.latest_obs_dict)) #important
+    while not done and len(ep_obs) < 300:
+        a = policy(get_observation(env, env.env.observation_spec())) #important
         ep_obs.append(o)
         ep_act.append(a)
         o, r, sys_done, info = env.step(a)
@@ -227,7 +227,7 @@ while ep <= 10:
         # done_ref = env_ref.is_success()['task']
         # step += 1
         # print(step)
-        # print(all(get_observation(env, env.env.env.latest_obs_dict)) ==  all(o_ref))
+        # print(all(get_observation(env, env.env.observation_spec())) ==  all(o_ref))
         # print(all(a) == all(a_ref))
         # print(done == done_ref)
     print(f'{ep}: done={done}, episode length={len(ep_obs)}')

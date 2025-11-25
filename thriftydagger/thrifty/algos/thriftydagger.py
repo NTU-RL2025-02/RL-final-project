@@ -177,6 +177,8 @@ def generate_offline_data(
     act_limit = env.action_space.high[0]
     while i < num_episodes:
         print("Episode #{}".format(i))
+        expert_policy.start_episode()
+        suboptimal_policy.start_episode()
         o, total_ret, d, t = env.reset(), 0, False, 0
         curr_obs, curr_act = [], []
         if robosuite:
@@ -385,6 +387,8 @@ def thrifty(
         """Run test episodes"""
         obs, act, done, rew = [], [], [], []
         for j in range(num_test_episodes):
+            expert_policy.start_episode()
+            suboptimal_policy.start_episode()
             o, d, ep_ret, ep_ret2, ep_len = env.reset(), False, 0, 0, 0
             while not d:
                 obs.append(o)
@@ -486,6 +490,8 @@ def thrifty(
         if t == 0:  # skip data collection on iter 0 to train Q
             i = obs_per_iter
         while i < obs_per_iter:
+            expert_policy.start_episode()
+            suboptimal_policy.start_episode()
             o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
             if robosuite:
                 robosuite_cfg["INPUT_DEVICE"].start_control()

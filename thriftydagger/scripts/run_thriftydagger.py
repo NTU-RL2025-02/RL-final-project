@@ -383,7 +383,7 @@ if __name__ == "__main__":
             expert_policy=expert_pol,
             suboptimal_policy=suboptimal_policy, 
             extra_obs_extractor=get_observation, 
-            input_file="models/model_epoch_2000_low_dim_v15_success_0.5-30.pkl",
+            input_file="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
             q_learning=True,
