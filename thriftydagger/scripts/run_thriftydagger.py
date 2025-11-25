@@ -14,6 +14,7 @@ from robosuite.devices import Keyboard
 import numpy as np
 import sys
 import time
+import wandb
 
 from thrifty.robomimic_expert import RobomimicExpert
 
@@ -24,11 +25,13 @@ expert_pol = RobomimicExpert(
     device="cuda" if torch.cuda.is_available() else "cpu",
 )
 
+
 class ObsCachingWrapper:
     """
     Lightweight wrapper that caches raw robosuite dict observations.
     Not a Gymnasium wrapper because the base robosuite env is not a Gym Env.
     """
+
     def __init__(self, env):
         self.env = env
         self.latest_obs_dict = None
@@ -50,6 +53,7 @@ class ObsCachingWrapper:
 
     def __getattr__(self, name):
         return getattr(self.env, name)
+
 
 class CustomWrapper(gymnasium.Env):
     def __init__(self, env, render):
@@ -74,7 +78,7 @@ class CustomWrapper(gymnasium.Env):
         return result
 
     def reset(self):
-        res = self.env.reset()      # o ?O obs ?V?q (23,)
+        res = self.env.reset()  # o ?O obs ?V?q (23,)
         o = res[0] if isinstance(res, tuple) else res
         self.render()
         settle_action = np.zeros(7)
@@ -190,6 +194,30 @@ if __name__ == "__main__":
             },
         },
     }
+    wandb.init(
+        entity="aawrail-RL2025",
+        project="final_project_exp0",
+        name=args.exp_name,
+        config={
+            "seed": args.seed,
+            "device": args.device,
+            "iters": args.iters,
+            "target_rate": args.targetrate,
+            "environment": args.environment,
+            "algo": (
+                "hgdagger"
+                if args.hgdagger
+                else (
+                    "lazydagger"
+                    if args.lazydagger
+                    else "thrifty_q" if True else "thrifty"
+                )
+            ),
+            "algo_sup": args.algo_sup,
+            "gen_data": args.gen_data,
+            "controller_configs": config["controller_configs"],
+        },
+    )
 
     # 建立 robosuite 環境
     env = suite.make(
@@ -210,7 +238,7 @@ if __name__ == "__main__":
         print("Binding environment wrapper to RobomimicExpert...")
         expert_pol.set_env(obs_cacher)
     env = GymWrapper(
-        obs_cacher,     
+        obs_cacher,
         keys=[
             "robot0_eef_pos",
             "robot0_eef_quat",
@@ -290,48 +318,50 @@ if __name__ == "__main__":
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
         )
-
-    if args.hgdagger:
-        thrifty(
-            env,
-            iters=args.iters,
-            logger_kwargs=logger_kwargs,
-            device_idx=args.device,
-            target_rate=args.targetrate,
-            seed=args.seed,
-            expert_policy=expert_pol,
-            input_file="robosuite-30.pkl",
-            robosuite=True,
-            robosuite_cfg=robosuite_cfg,
-            num_nets=1,
-            hg_dagger=hg_dagger_wait,
-            init_model=args.eval,
-        )
-    elif args.lazydagger:
-        lazy(
-            env,
-            iters=args.iters,
-            logger_kwargs=logger_kwargs,
-            device_idx=args.device,
-            noise=0.0,
-            seed=args.seed,
-            expert_policy=expert_pol,
-            input_file="robosuite-30.pkl",
-            robosuite=True,
-            robosuite_cfg=robosuite_cfg,
-        )
-    else:
-        thrifty(
-            env,
-            iters=args.iters,
-            logger_kwargs=logger_kwargs,
-            device_idx=args.device,
-            target_rate=args.targetrate,
-            seed=args.seed,
-            expert_policy=expert_pol,
-            input_file="rollout.pkl",
-            robosuite=True,
-            robosuite_cfg=robosuite_cfg,
-            q_learning=True,
-            init_model=args.eval,
-        )
+    try:
+        if args.hgdagger:
+            thrifty(
+                env,
+                iters=args.iters,
+                logger_kwargs=logger_kwargs,
+                device_idx=args.device,
+                target_rate=args.targetrate,
+                seed=args.seed,
+                expert_policy=expert_pol,
+                input_file="robosuite-30.pkl",
+                robosuite=True,
+                robosuite_cfg=robosuite_cfg,
+                num_nets=1,
+                hg_dagger=hg_dagger_wait,
+                init_model=args.eval,
+            )
+        elif args.lazydagger:
+            lazy(
+                env,
+                iters=args.iters,
+                logger_kwargs=logger_kwargs,
+                device_idx=args.device,
+                noise=0.0,
+                seed=args.seed,
+                expert_policy=expert_pol,
+                input_file="robosuite-30.pkl",
+                robosuite=True,
+                robosuite_cfg=robosuite_cfg,
+            )
+        else:
+            thrifty(
+                env,
+                iters=args.iters,
+                logger_kwargs=logger_kwargs,
+                device_idx=args.device,
+                target_rate=args.targetrate,
+                seed=args.seed,
+                expert_policy=expert_pol,
+                input_file="rollout.pkl",
+                robosuite=True,
+                robosuite_cfg=robosuite_cfg,
+                q_learning=True,
+                init_model=args.eval,
+            )
+    finally:
+        wandb.finish()

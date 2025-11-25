@@ -16,6 +16,7 @@ import numpy as np
 import torch
 import os.path as osp, time, atexit, os
 import warnings
+import wandb
 
 # from spinup.utils.mpi_tools import proc_id, mpi_statistics_scalar
 from thrifty.utils.serialization_utils import convert_json
@@ -325,6 +326,12 @@ class Logger:
             print(fmt % (key, valstr))
             vals.append(val)
         print("-" * n_slashes, flush=True)
+        # ====== 這裡：如果 wandb 有啟動，就把這一 row 丟給 wandb ======
+        if wandb.run is not None:
+            # 注意：wandb.log 需要傳 dict，直接用 log_current_row 即可
+            wandb.log(dict(self.log_current_row))
+        # ============================================================
+
         if self.output_file is not None:
             if self.first_row:
                 self.output_file.write("\t".join(self.log_headers) + "\n")

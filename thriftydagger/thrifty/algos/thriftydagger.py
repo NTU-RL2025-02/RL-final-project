@@ -259,7 +259,7 @@ def thrifty(
         logger.save_config(_locals)
     except TypeError as e:
         print(f"[Warning] Could not save config as JSON: {e}")
-    
+
     if device_idx >= 0:
         device = torch.device("cuda", device_idx)
     else:
@@ -607,7 +607,7 @@ def thrifty(
                 env.action_space,
                 device,
                 num_nets=num_nets,
-                **ac_kwargs
+                **ac_kwargs,
             )
             pi_optimizers = [
                 Adam(ac.pis[i].parameters(), lr=pi_lr) for i in range(ac.num_nets)
@@ -659,3 +659,21 @@ def thrifty(
         print("NumSwitchToNov", num_switch_to_human)
         print("NumSwitchToRisk", num_switch_to_human2)
         print("NumSwitchBack", num_switch_to_robot)
+
+        # ===== 用 EpochLogger 寫入 progress.txt =====
+        success_rate = (ep_num - fail_ct) / ep_num if ep_num > 0 else 0.0
+        logger.log_tabular("Epoch", t)
+        logger.log_tabular("LossPi", sum(loss_pi) / len(loss_pi))
+        if q_learning:
+            logger.log_tabular("LossQ", sum(loss_q) / len(loss_q))
+        logger.log_tabular("TotalEpisodes", ep_num)
+        logger.log_tabular("TotalSuccesses", ep_num - fail_ct)
+        logger.log_tabular("SuccessRate", success_rate)
+        logger.log_tabular("TotalEnvInteracts", total_env_interacts)
+        logger.log_tabular("OnlineBurden", online_burden)
+        logger.log_tabular("NumSwitchToNov", num_switch_to_human)
+        logger.log_tabular("NumSwitchToRisk", num_switch_to_human2)
+        logger.log_tabular("NumSwitchBack", num_switch_to_robot)
+
+        logger.dump_tabular()
+        # ============================================
