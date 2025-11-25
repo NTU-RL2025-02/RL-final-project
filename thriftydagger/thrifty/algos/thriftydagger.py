@@ -252,6 +252,9 @@ def thrifty(
     num_test_episodes: run this many episodes after each iter without interventions
     init_model: initial NN weights
     """
+    
+
+
     logger = EpochLogger(**logger_kwargs)
     _locals = locals()
     del _locals["env"]

@@ -23,7 +23,7 @@ from thrifty.robomimic_expert import RobomimicExpert
 # 這裡用你搬到比較短路徑的 expert model
 # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
 expert_pol = RobomimicExpert(
-    "expert_model/model_epoch_200_low_dim_v15_success_0.1.pth",
+    "models/model_epoch_2000_low_dim_v15_success_0.5.pth",
     device="cuda" if torch.cuda.is_available() else "cpu",
 )
 
