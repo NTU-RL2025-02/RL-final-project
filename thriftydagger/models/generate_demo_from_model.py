@@ -96,6 +96,7 @@ class CustomWrapper(gym.Env):
             self.env.render()
 
 lang_emb = np.load('models/lang_emb.npy')
+
 def get_observation(env, di):
     """
     Get current environment observation dictionary.
@@ -134,18 +135,6 @@ def get_observation(env, di):
     ret[LangUtils.LANG_EMB_OBS_KEY] = np.array(lang_emb)
     return ret
 
-def get_real_depth_map(env, depth_map):
-    """
-    Reproduced from https://github.com/ARISE-Initiative/robosuite/blob/c57e282553a4f42378f2635b9a3cbc4afba270fd/robosuite/utils/camera_utils.py#L106
-    since older versions of robosuite do not have this conversion from normalized depth values returned by MuJoCo
-    to real depth values.
-    """
-    # Make sure that depth values are normalized
-    assert np.all(depth_map >= 0.0) and np.all(depth_map <= 1.0)
-    extent = env.sim.model.stat.extent
-    far = env.sim.model.vis.map.zfar * extent
-    near = env.sim.model.vis.map.znear * extent
-    return near / (1.0 - depth_map * (1.0 - near / far))
 
 robosuite_env_name = "NutAssemblySquare"
 robots = "Panda"
@@ -220,14 +209,16 @@ policy, _ = policy_from_checkpoint(ckpt_dict=ckpt_dict)
 
 obs_list, act_list = [], []
 ep = 1
-while ep <= 30:
+while ep <= 10:
     ep_obs, ep_act = [], []
-    policy.start_episode()
+    policy.start_episode() # important
     o, done = env.reset(), False
     # o_ref, done_ref = env_ref.reset(), False
     step = 0
-    while not done and len(ep_obs) < 300:
-        a = policy(get_observation(env, env.env.env.latest_obs_dict))
+    while not done and len(ep_obs) < 250:
+        a = policy(get_observation(env, env.env.env.latest_obs_dict)) #important
+        ep_obs.append(o)
+        ep_act.append(a)
         o, r, sys_done, info = env.step(a)
         done = env._check_success()
         
@@ -239,8 +230,6 @@ while ep <= 30:
         # print(all(get_observation(env, env.env.env.latest_obs_dict)) ==  all(o_ref))
         # print(all(a) == all(a_ref))
         # print(done == done_ref)
-        ep_obs.append(o)
-        ep_act.append(a)
     print(f'{ep}: done={done}, episode length={len(ep_obs)}')
     if done:
         ep += 1

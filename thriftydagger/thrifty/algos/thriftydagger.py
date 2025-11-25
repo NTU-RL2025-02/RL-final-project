@@ -214,6 +214,8 @@ def generate_offline_data(
     pickle.dump({"obs": np.stack(obs), "act": np.stack(act)}, open(output_file, "wb"))
 
 
+
+
 def thrifty(
     env,
     iters=5,
@@ -232,6 +234,7 @@ def thrifty(
     device_idx=0,
     expert_policy=None,
     suboptimal_policy=None,
+    extra_obs_extractor=None,
     num_nets=5,
     target_rate=0.01,
     robosuite=False,
@@ -506,7 +509,7 @@ def thrifty(
                     estimates.append(ac.variance(o))
                     estimates2.append(ac.safety(o, a))
                 if expert_mode:
-                    a_expert = expert_policy(o)
+                    a_expert = expert_policy(extra_obs_extractor(env, env.env.env.latest_obs_dict))
                     a_expert = np.clip(a_expert, -act_limit, act_limit)
                     replay_buffer.store(o, a_expert)
                     online_burden += 1
@@ -527,7 +530,7 @@ def thrifty(
                     s = env._check_success()
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
                 elif safety_mode:
-                    a_suboptimal_policy = suboptimal_policy(o)
+                    a_suboptimal_policy = suboptimal_policy(extra_obs_extractor(env, env.env.env.latest_obs_dict))
                     a_suboptimal_policy = np.clip(a_suboptimal_policy, -act_limit, act_limit)
                     replay_buffer.store(o, a_suboptimal_policy)
                     risk.append(ac.safety(o, a_suboptimal_policy))
