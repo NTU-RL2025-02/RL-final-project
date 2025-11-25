@@ -326,11 +326,11 @@ class Logger:
             print(fmt % (key, valstr))
             vals.append(val)
         print("-" * n_slashes, flush=True)
-        # ====== 這裡：如果 wandb 有啟動，就把這一 row 丟給 wandb ======
+        # ====== If wandb is active, log this row to wandb ======
         if wandb.run is not None:
-            # 注意：wandb.log 需要傳 dict，直接用 log_current_row 即可
+            # Note: wandb.log expects a dict, use log_current_row directly
             wandb.log(dict(self.log_current_row))
-        # ============================================================
+        # ========================================================
 
         if self.output_file is not None:
             if self.first_row:
