@@ -23,6 +23,10 @@ expert_pol = RobomimicExpert(
     "models/model_epoch_2000_low_dim_v15_success_0.5.pth",
     device="cuda" if torch.cuda.is_available() else "cpu",
 )
+suboptimal_policy = RobomimicExpert(
+    "models/model_epoch_1000.pth",
+    device="cuda" if torch.cuda.is_available() else "cpu",
+)
 
 class ObsCachingWrapper:
     """
@@ -329,6 +333,7 @@ if __name__ == "__main__":
             target_rate=args.targetrate,
             seed=args.seed,
             expert_policy=expert_pol,
+            suboptimal_policy=suboptimal_policy, 
             input_file="models/model_epoch_2000_low_dim_v15_success_0.5-30.pkl",
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
