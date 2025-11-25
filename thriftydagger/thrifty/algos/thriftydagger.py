@@ -648,9 +648,13 @@ def thrifty(
         # end of epoch logging
         logger.save_state(dict())
         print("Epoch", t)
+        avg_loss_pi = 0.0
+        avg_loss_q = 0.0
         if t > 0:
+            avg_loss_pi = sum(loss_pi) / len(loss_pi)
             print("LossPi", sum(loss_pi) / len(loss_pi))
         if q_learning:
+            avg_loss_q = sum(loss_q) / len(loss_q)
             print("LossQ", sum(loss_q) / len(loss_q))
         print("TotalEpisodes", ep_num)
         print("TotalSuccesses", ep_num - fail_ct)
@@ -663,9 +667,9 @@ def thrifty(
         # ===== 用 EpochLogger 寫入 progress.txt =====
         success_rate = (ep_num - fail_ct) / ep_num if ep_num > 0 else 0.0
         logger.log_tabular("Epoch", t)
-        logger.log_tabular("LossPi", sum(loss_pi) / len(loss_pi))
+        logger.log_tabular("LossPi", avg_loss_pi)
         if q_learning:
-            logger.log_tabular("LossQ", sum(loss_q) / len(loss_q))
+            logger.log_tabular("LossQ", avg_loss_q)
         logger.log_tabular("TotalEpisodes", ep_num)
         logger.log_tabular("TotalSuccesses", ep_num - fail_ct)
         logger.log_tabular("SuccessRate", success_rate)
