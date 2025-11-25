@@ -664,7 +664,7 @@ def thrifty(
         print("NumSwitchToRisk", num_switch_to_human2)
         print("NumSwitchBack", num_switch_to_robot)
 
-        # ===== 用 EpochLogger 寫入 progress.txt =====
+        # ===== Write to progress.txt using EpochLogger =====
         success_rate = (ep_num - fail_ct) / ep_num if ep_num > 0 else 0.0
         logger.log_tabular("Epoch", t)
         logger.log_tabular("LossPi", avg_loss_pi)
