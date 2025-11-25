@@ -222,22 +222,23 @@ obs_list, act_list = [], []
 ep = 1
 while ep <= 30:
     ep_obs, ep_act = [], []
+    policy.start_episode()
     o, done = env.reset(), False
-    o_ref, done_ref = env_ref.reset(), False
+    # o_ref, done_ref = env_ref.reset(), False
     step = 0
-    while not done and len(ep_obs) < 500:
+    while not done and len(ep_obs) < 300:
         a = policy(get_observation(env, env.env.env.latest_obs_dict))
         o, r, sys_done, info = env.step(a)
         done = env._check_success()
         
-        a_ref = policy(o_ref)
-        o_ref, r, sys_done, info = env_ref.step(a_ref)
-        done_ref = env_ref.is_success()['task']
-        step += 1
-        print(step)
-        print(all(get_observation(env, env.env.env.latest_obs_dict)) ==  all(o_ref))
-        print(all(a) == all(a_ref))
-        print(done == done_ref)
+        # a_ref = policy(o_ref)
+        # o_ref, r, sys_done, info = env_ref.step(a_ref)
+        # done_ref = env_ref.is_success()['task']
+        # step += 1
+        # print(step)
+        # print(all(get_observation(env, env.env.env.latest_obs_dict)) ==  all(o_ref))
+        # print(all(a) == all(a_ref))
+        # print(done == done_ref)
         ep_obs.append(o)
         ep_act.append(a)
     print(f'{ep}: done={done}, episode length={len(ep_obs)}')
