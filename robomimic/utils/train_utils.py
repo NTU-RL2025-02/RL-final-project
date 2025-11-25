@@ -354,7 +354,7 @@ def run_rollout(
             # visualization
             if video_writer is not None:
                 if video_count % video_skip == 0:
-                    frame = env.render(mode="rgb_array", height=512, width=512)
+                    frame = env.render(mode="rgb_array", height=320, width=320)
                     video_frames.append(frame)
 
                 video_count += 1

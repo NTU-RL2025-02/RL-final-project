@@ -117,11 +117,11 @@ venv.bak/
 # mypy
 .mypy_cache/
 *.mp4
-*.pth
 
 # private macros
 macros_private.py
 
 # exp files
 robomimic/expspapers
-robomimic/expspaper*
+robomimic/expspaper/core/bc_rnn/square/ph/low_dim/trained_models/core_bc_rnn_square_ph_low_dim/20251125005357/videos
+robomimic/expspaper/core/bc_rnn/square/ph/low_dim/trained_models/core_bc_rnn_square_ph_low_dim/20251125005357/logs
