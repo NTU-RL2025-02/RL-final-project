@@ -12,17 +12,35 @@ obs_list, act_list = [], []
 ep = 1
 while ep <= 30:
     ep_obs, ep_act = [], []
-    env.reset()
     policy.start_episode()
     o, done = env.reset(), False
-    while not done and len(ep_obs) < 10000:
+    while not done and len(ep_obs) < 500:
         a = policy(o)
         ep_obs.append(o)
         ep_act.append(a)
-        o, r, done, info = env.step(a)
+        o, r, sys_done, info = env.step(a)
+        done = env.is_success()["task"]
     print(f'{ep}: done={done}, episode length={len(ep_obs)}')
     if done:
         ep += 1
         obs_list.extend(ep_obs)
         act_list.extend(ep_act)
-pickle.dump({"obs": np.array(obs_list), "act": np.array(act_list)}, open(f"models/{model_name}.pkl", "wb"))
+pickle.dump({"obs": np.array(obs_list), "act": np.array(act_list)}, open(f"models/{model_name}-30.pkl", "wb"))
+
+ep = 1
+while ep <= 300:
+    ep_obs, ep_act = [], []
+    policy.start_episode()
+    o, done = env.reset(), False
+    while not done and len(ep_obs) < 500:
+        a = policy(o)
+        ep_obs.append(o)
+        ep_act.append(a)
+        o, r, sys_done, info = env.step(a)
+        done = env.is_success()["task"]
+    print(f'{ep}: done={done}, episode length={len(ep_obs)}')
+    if done:
+        ep += 1
+        obs_list.extend(ep_obs)
+        act_list.extend(ep_act)
+pickle.dump({"obs": np.array(obs_list), "act": np.array(act_list)}, open(f"models/{model_name}-300.pkl", "wb"))
