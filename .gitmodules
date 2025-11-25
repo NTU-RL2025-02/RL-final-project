@@ -1,8 +1,0 @@
-[submodule "robomimic"]
-	path = robomimic
-	url = https://github.com/NTU-RL2025-02/robomimic
-    branch = master
-[submodule "thriftydagger"]
-	path = thriftydagger
-	url = https://github.com/NTU-RL2025-02/thriftydagger
-    branch = master
