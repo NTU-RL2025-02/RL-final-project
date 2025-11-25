@@ -231,6 +231,7 @@ def thrifty(
     input_file="data.pkl",
     device_idx=0,
     expert_policy=None,
+    suboptimal_policy=None,
     num_nets=5,
     target_rate=0.01,
     robosuite=False,
@@ -482,7 +483,7 @@ def thrifty(
         if t == 0:  # skip data collection on iter 0 to train Q
             i = obs_per_iter
         while i < obs_per_iter:
-            o, d, expert_mode, ep_len = env.reset(), False, False, 0
+            o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
             if robosuite:
                 robosuite_cfg["INPUT_DEVICE"].start_control()
             obs, act, rew, done, sup, var, risk = (
@@ -525,6 +526,26 @@ def thrifty(
                     sup.append(1)
                     s = env._check_success()
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
+                elif safety_mode:
+                    a_suboptimal_policy = suboptimal_policy(o)
+                    a_suboptimal_policy = np.clip(a_suboptimal_policy, -act_limit, act_limit)
+                    replay_buffer.store(o, a_suboptimal_policy)
+                    risk.append(ac.safety(o, a_suboptimal_policy))
+                    if (hg_dagger and a_suboptimal_policy[3] != 0) or (
+                        not hg_dagger
+                        and sum((a - a_suboptimal_policy) ** 2) < switch2robot_thresh
+                        and (not q_learning or ac.safety(o, a) > switch2robot_thresh2)
+                    ):
+                        print("Switch to Robot")
+                        safety_mode = False
+                        num_switch_to_robot += 1
+                        o2, _, d, _ = env.step(a_suboptimal_policy)
+                    else:
+                        o2, _, d, _ = env.step(a_suboptimal_policy)
+                    act.append(a_suboptimal_policy)
+                    sup.append(1)
+                    s = env._check_success()
+                    qbuffer.store(o, a_suboptimal_policy, o2, int(s), (ep_len + 1 >= horizon) or s)
                 # hg-dagger switching for hg-dagger, or novelty switching for thriftydagger
                 elif (hg_dagger and hg_dagger()) or (
                     not hg_dagger and ac.variance(o) > switch2human_thresh
@@ -541,7 +562,7 @@ def thrifty(
                 ):
                     print("Switch to Human (Risk)")
                     num_switch_to_human2 += 1
-                    expert_mode = True
+                    safety_mode = True
                     continue
                 else:
                     risk.append(ac.safety(o, a))
