@@ -5,6 +5,7 @@ import torch
 from torch.optim import Adam
 import time
 import thrifty.algos.core as core
+from thrifty.CBF import CBFController
 from thrifty.utils.logx import EpochLogger
 import pickle
 import os
@@ -276,6 +277,7 @@ def thrifty(
     act_limit = env.action_space.high[0]
     assert act_limit == -1 * env.action_space.low[0], "Action space should be symmetric"
     horizon = robosuite_cfg["MAX_EP_LEN"]
+    cbf_controller = CBFController(act_limit)
 
     # initialize actor and classifier NN
     ac = actor_critic(
@@ -536,10 +538,15 @@ def thrifty(
                     and q_learning
                     and ac.safety(o, a) < switch2human_thresh2
                 ):
-                    print("Switch to Human (Risk)")
+                    print("CBF Recovery (Risk)")
                     num_switch_to_human2 += 1
-                    expert_mode = True
-                    continue
+                    a_cbf = cbf_controller.get_safe_action(o, a)
+                    o2, _, d, _ = env.step(a_cbf)
+                    act.append(a_cbf)
+                    sup.append(2)  # 2 denotes CBF override
+                    s = env._check_success()
+                    qbuffer.store(o, a_cbf, o2, int(s), (ep_len + 1 >= horizon) or s)
+                    risk.append(ac.safety(o, a_cbf))
                 else:
                     risk.append(ac.safety(o, a))
                     o2, _, d, _ = env.step(a)
