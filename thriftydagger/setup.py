@@ -33,6 +33,7 @@ setup(
         "pygame",
         "robosuite_models",
         "black",
+        "wandb",
     ],
     description="Code for ThriftyDAgger.",
     author="Ryan Hoque",
