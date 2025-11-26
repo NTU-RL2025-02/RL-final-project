@@ -101,7 +101,7 @@ class QReplayBuffer:
                     neg_size,
                 )
             )
-            idxs = np.hstack((pos_idx, neg_idx))
+            idxs = np.hstack((pos_idx, neg_idx)).astype(np.int64)
             np.random.shuffle(idxs)
         else:
             idxs = np.random.randint(0, self.size, size=batch_size)
@@ -720,6 +720,6 @@ def thrifty(
         logger.dump_tabular()
         # ============================================
 
-        if num_switch_to_human >= max_expert_query:
+        if online_burden >= max_expert_query:
             print("Reached max expert queries, stopping training.")
             break
