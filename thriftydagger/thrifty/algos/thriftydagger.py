@@ -288,7 +288,10 @@ def thrifty(
         env.observation_space, env.action_space, device, num_nets=num_nets, **ac_kwargs
     )
     if init_model:
-        ac = torch.load(init_model, map_location=device).to(device)
+        try:
+            ac = torch.load(init_model, map_location=device, weights_only=False).to(device)
+        except TypeError:
+            ac = torch.load(init_model, map_location=device).to(device)
         ac.device = device
     ac_targ = deepcopy(ac)
     for p in ac_targ.parameters():
