@@ -243,6 +243,7 @@ def thrifty(
     q_learning=False,
     gamma=0.9999,
     init_model=None,
+    max_expert_query=2000,
 ):
     """
     obs_per_iter: environment steps per algorithm iteration
@@ -718,3 +719,7 @@ def thrifty(
 
         logger.dump_tabular()
         # ============================================
+
+        if num_switch_to_human >= max_expert_query:
+            print("Reached max expert queries, stopping training.")
+            break

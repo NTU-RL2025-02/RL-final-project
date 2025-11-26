@@ -207,6 +207,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--targetrate", type=float, default=0.01, help="target context switching rate"
     )
+    parser.add_argument(
+        "--max_expert_query",
+        type=int,
+        default=2000,
+        help="maximum number of expert queries allowed",
+    )
     # 你可以下 --environment Square，就會自動用 NutAssemblySquare + Panda
     parser.add_argument("--environment", type=str, default="NutAssembly")
     parser.add_argument("--no_render", action="store_true")
@@ -276,6 +282,7 @@ if __name__ == "__main__":
             "iters": args.iters,
             "target_rate": args.targetrate,
             "environment": args.environment,
+            "max_expert_query": args.max_expert_query,
             "algo": (
                 "hgdagger"
                 if args.hgdagger
@@ -411,6 +418,7 @@ if __name__ == "__main__":
                 num_nets=1,
                 hg_dagger=hg_dagger_wait,
                 init_model=args.eval,
+                max_expert_query=args.max_expert_query,
             )
         elif args.lazydagger:
             lazy(
@@ -441,6 +449,7 @@ if __name__ == "__main__":
                 robosuite_cfg=robosuite_cfg,
                 q_learning=True,
                 init_model=args.eval,
+                max_expert_query=args.max_expert_query,
             )
     finally:
         wandb.finish()
