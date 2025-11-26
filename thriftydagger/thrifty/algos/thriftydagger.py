@@ -181,8 +181,8 @@ def generate_offline_data(
         suboptimal_policy.start_episode()
         o, total_ret, d, t = env.reset(), 0, False, 0
         curr_obs, curr_act = [], []
-        if robosuite:
-            robosuite_cfg["INPUT_DEVICE"].start_control()
+        # if robosuite:
+        #     robosuite_cfg["INPUT_DEVICE"].start_control()
         while not d:
             a = expert_policy(o)
             if a is None:
@@ -489,8 +489,8 @@ def thrifty(
             expert_policy.start_episode()
             suboptimal_policy.start_episode()
             o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
-            if robosuite:
-                robosuite_cfg["INPUT_DEVICE"].start_control()
+            # if robosuite:
+            #     robosuite_cfg["INPUT_DEVICE"].start_control()
             obs, act, rew, done, sup, var, risk = (
                 [o],
                 [],
