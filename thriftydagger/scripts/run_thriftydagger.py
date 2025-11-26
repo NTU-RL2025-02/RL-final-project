@@ -6,7 +6,9 @@ import gymnasium
 import torch
 import robosuite as suite
 from robosuite.controllers import load_composite_controller_config
-from robosuite.devices.mjgui import MJGUI
+
+# FIXME: commented out to disable MJGUI-related behavior
+# from robosuite.devices.mjgui import MJGUI
 from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
 from robosuite.wrappers import VisualizationWrapper
 from robosuite.wrappers import GymWrapper
@@ -260,18 +262,20 @@ if __name__ == "__main__":
 
     def hg_dagger_wait():
         # for HG-dagger, repurpose the 'Z' key (action elem 3) for starting/ending interaction
-        for _ in range(10):
-            a, _ = MJGUI.input2action(
-                device=input_device,
-                robot=active_robot,
-                active_arm=arm_,
-                env_configuration=config_,
-            )
-            env.render()
-            time.sleep(0.001)
-            if a[3] != 0:  # z is pressed
-                break
-        return a[3] != 0
+        # FIXME: commented out to disable MJGUI-related behavior
+        # for _ in range(10):
+        #     a, _ = MJGUI.input2action(
+        #         device=input_device,
+        #         robot=active_robot,
+        #         active_arm=arm_,
+        #         env_configuration=config_,
+        #     )
+        #     env.render()
+        #     time.sleep(0.001)
+        #     if a[3] != 0:  # z is pressed
+        #         break
+        # return a[3] != 0
+        pass
 
     def human_expert_pol(o):
         a = np.zeros(7)
@@ -288,12 +292,13 @@ if __name__ == "__main__":
         a_ref = a.copy()
         # pause simulation if there is no user input (instead of recording a no-op)
         while np.array_equal(a, a_ref):
-            a, _ = MJGUI.input2action(
-                device=input_device,
-                robot=active_robot,
-                active_arm=arm_,
-                env_configuration=config_,
-            )
+            # FIXME: commented out to disable MJGUI-related behavior
+            # a, _ = MJGUI.input2action(
+            #     device=input_device,
+            #     robot=active_robot,
+            #     active_arm=arm_,
+            #     env_configuration=config_,
+            # )
             env.render()
             time.sleep(0.001)
         return a
