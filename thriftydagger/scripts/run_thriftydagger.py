@@ -29,11 +29,11 @@ from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoi
 
 expert_pol, _ = policy_from_checkpoint(
     device="cuda" if torch.cuda.is_available() else "cpu",
-   	ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth"
+    ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth",
 )
 suboptimal_policy, _ = policy_from_checkpoint(
     device="cuda" if torch.cuda.is_available() else "cpu",
-    ckpt_path="models/model_epoch_1000.pth"
+    ckpt_path="models/model_epoch_1000.pth",
 )
 lang_emb = np.load("models/lang_emb.npy")
 
