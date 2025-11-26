@@ -28,10 +28,12 @@ from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoi
 # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
 
 expert_pol, _ = policy_from_checkpoint(
-    device="cuda", ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth"
+    device="cuda" if torch.cuda.is_available() else "cpu",
+   	ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth"
 )
 suboptimal_policy, _ = policy_from_checkpoint(
-    device="cuda", ckpt_path="models/model_epoch_1000.pth"
+    device="cuda" if torch.cuda.is_available() else "cpu",
+    ckpt_path="models/model_epoch_1000.pth"
 )
 lang_emb = np.load("models/lang_emb.npy")
 
@@ -434,7 +436,7 @@ if __name__ == "__main__":
                 expert_policy=expert_pol,
                 suboptimal_policy=suboptimal_policy,
                 extra_obs_extractor=get_observation,
-                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
+                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-300.pkl",
                 robosuite=True,
                 robosuite_cfg=robosuite_cfg,
                 q_learning=True,
