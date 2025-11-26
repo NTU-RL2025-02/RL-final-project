@@ -685,9 +685,14 @@ def thrifty(
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
                 elif safety_mode:
                     # safety_mode 下改由 suboptimal/safety policy 控制
-                    a_suboptimal_policy = suboptimal_policy(
+                    # a_suboptimal_policy = suboptimal_policy(
+                    #     extra_obs_extractor(env, env.env.env.latest_obs_dict)
+                    # )
+                    # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
+                    a_suboptimal_policy = expert_policy(
                         extra_obs_extractor(env, env.env.env.latest_obs_dict)
                     )
+
                     a_suboptimal_policy = np.clip(
                         a_suboptimal_policy, -act_limit, act_limit
                     )
