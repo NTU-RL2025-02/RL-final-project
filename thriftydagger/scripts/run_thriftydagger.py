@@ -12,7 +12,8 @@ from robosuite.controllers import load_composite_controller_config
 from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
 from robosuite.wrappers import VisualizationWrapper
 from robosuite.wrappers import GymWrapper
-from robosuite.devices import Keyboard
+
+# from robosuite.devices import Keyboard
 import numpy as np
 import sys
 import time
@@ -320,9 +321,10 @@ if __name__ == "__main__":
 
     arm_ = "right"
     config_ = "single-arm-opposed"
-    input_device = Keyboard(env, pos_sensitivity=0.5, rot_sensitivity=3.0)
+    # input_device = Keyboard(env, pos_sensitivity=0.5, rot_sensitivity=3.0)
     if render:
-        env.viewer.add_keypress_callback(input_device.on_press)
+        pass
+        # env.viewer.add_keypress_callback(input_device.on_press)
         # env.viewer.add_keyup_callback(input_device.on_release)
         # env.viewer.add_keyrepeat_callback(input_device.on_press)
     active_robot = env.robots[arm_ == "left"]
@@ -348,14 +350,14 @@ if __name__ == "__main__":
         a = np.zeros(7)
         if env.gripper_closed:
             a[-1] = 1.0
-            input_device.grasp = (
-                True  # TODO: find how to alter input_device.grasp to newer robosuite
-            )
+            # input_device.grasp = (
+            #     True  # TODO: find how to alter input_device.grasp to newer robosuite
+            # )
         else:
             a[-1] = -1.0
-            input_device.grasp = (
-                False  # TODO: find how to alter input_device.grasp to newer robosuite
-            )
+            # input_device.grasp = (
+            #     False  # TODO: find how to alter input_device.grasp to newer robosuite
+            # )
         a_ref = a.copy()
         # pause simulation if there is no user input (instead of recording a no-op)
         while np.array_equal(a, a_ref):
@@ -370,7 +372,7 @@ if __name__ == "__main__":
             time.sleep(0.001)
         return a
 
-    robosuite_cfg = {"MAX_EP_LEN": 175, "INPUT_DEVICE": input_device}
+    robosuite_cfg = {"MAX_EP_LEN": 175}  # "INPUT_DEVICE": input_device}
 
     # 根據參數決定要用哪一種 expert
     if args.algo_sup:
