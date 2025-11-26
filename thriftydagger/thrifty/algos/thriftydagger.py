@@ -536,7 +536,9 @@ def thrifty(
         test_agent(0)
         sys.exit(0)
 
-    # train policy
+    ##############################################
+    # ====== Pre-training with offline data ======
+    ###############################################
     # 先用 BC 在 offline data 上訓練每個 policy (ensemble)
     for i in range(ac.num_nets):
         if ac.num_nets > 1:  # create new datasets via sampling with replacement
@@ -604,7 +606,9 @@ def thrifty(
     ep_num = 0  # 總 episode 數
     fail_ct = 0  # 失敗 episode 數 (超過 horizon)
 
-    # 主要的 ThriftyDAgger 迭代 loop
+    #######################################
+    # ====== Main ThriftyDAgger Loop ======
+    #######################################
     for t in range(iters + 1):
         # logging_data: 存這次 iter 的完整 rollouts 資料 (方便之後分析)
         logging_data = []  # for verbose logging
