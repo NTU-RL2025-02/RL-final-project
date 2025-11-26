@@ -6,6 +6,7 @@ from torch.optim import Adam
 import time
 import thrifty.algos.core as core
 from thrifty.CBF import CBFController
+from thrifty.utils.data_driven_recovery import DataDrivenRecovery
 from thrifty.utils.logx import EpochLogger
 import pickle
 import os
@@ -319,6 +320,13 @@ def thrifty(
         obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
     )
     qbuffer.fill_buffer_from_BC(input_data)
+    # Data-driven recovery uses expert buffer for nearest-neighbor lookup when risky.
+    dd_recovery = DataDrivenRecovery(
+        replay_buffer,
+        action_gain=5.0,
+        max_action=act_limit,
+        min_z_margin=0.0,
+    )
 
     # Set up function for computing actor loss
     def compute_loss_pi(data, i):
@@ -538,15 +546,16 @@ def thrifty(
                     and q_learning
                     and ac.safety(o, a) < switch2human_thresh2
                 ):
-                    print("CBF Recovery (Risk)")
+                    print("Data-driven Recovery (Risk)")
                     num_switch_to_human2 += 1
-                    a_cbf = cbf_controller.get_safe_action(o, a)
-                    o2, _, d, _ = env.step(a_cbf)
-                    act.append(a_cbf)
-                    sup.append(2)  # 2 denotes CBF override
+                    a_rec = dd_recovery(o)
+                    sup_code = 3  # denote data-driven override
+                    o2, _, d, _ = env.step(a_rec)
+                    act.append(a_rec)
+                    sup.append(sup_code)
                     s = env._check_success()
-                    qbuffer.store(o, a_cbf, o2, int(s), (ep_len + 1 >= horizon) or s)
-                    risk.append(ac.safety(o, a_cbf))
+                    qbuffer.store(o, a_rec, o2, int(s), (ep_len + 1 >= horizon) or s)
+                    risk.append(ac.safety(o, a_rec))
                 else:
                     risk.append(ac.safety(o, a))
                     o2, _, d, _ = env.step(a)

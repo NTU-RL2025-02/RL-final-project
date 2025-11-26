@@ -10,6 +10,9 @@ from thrifty.tests.test_recovery import (
     test_emergency_lift_blocks_xy_motion,
     test_yield_when_within_xy_tolerance,
 )
+from thrifty.tests.test_recovery_state_flat import (
+    test_get_recovery_state_from_flat_extracts_expected_slices,
+)
 from thrifty.CBF import CBFController
 
 
@@ -26,5 +29,6 @@ def test_cbf_suite():
     test_emergency_lift_blocks_xy_motion()
     test_airborne_alignment_moves_toward_target_xy_only()
     test_yield_when_within_xy_tolerance()
+    test_get_recovery_state_from_flat_extracts_expected_slices()
 
 test_cbf_suite()
