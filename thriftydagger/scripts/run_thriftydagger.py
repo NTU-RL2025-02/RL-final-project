@@ -35,17 +35,6 @@ from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
 from thrifty.robomimic_expert import RobomimicExpert
 from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
 
-
-# 這裡用你搬到比較短路徑的 expert model
-# 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
-expert_pol, _ = policy_from_checkpoint(
-    device="cuda" if torch.cuda.is_available() else "cpu",
-    ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth",
-)
-suboptimal_policy, _ = policy_from_checkpoint(
-    device="cuda" if torch.cuda.is_available() else "cpu",
-    ckpt_path="models/model_epoch_1000.pth",
-)
 lang_emb = np.load("models/lang_emb.npy")
 
 
@@ -201,6 +190,21 @@ def create_env(config, render, expert_pol=None):
 
 
 def main(args):
+    # ---- load expert policy ----
+    # 這裡用你搬到比較短路徑的 expert model
+    # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    expert_pol, _ = policy_from_checkpoint(
+        device=device,
+        ckpt_path=args.expert_policy_file,
+    )
+
+    recovery_policy, _ = policy_from_checkpoint(
+        device=device
+        ckpt_path="models/model_epoch_1000.pth",
+    )
+
     render = not args.no_render
 
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
@@ -221,7 +225,8 @@ def main(args):
             "environment": args.environment,
             "max_expert_query": args.max_expert_query,
             "algo": ("thrifty_q" if True else "thrifty"),
-            "algo_sup": args.algo_sup,
+            "expert_policy_file": args.expert_policy_file,
+            "demonstration_set_file": args.demonstration_set_file,
             "gen_data": args.gen_data,
             "controller_configs": config["controller_configs"],
         },
@@ -262,9 +267,9 @@ def main(args):
             target_rate=args.targetrate,
             seed=args.seed,
             expert_policy=expert,
-            suboptimal_policy=suboptimal_policy,
+            recovery_policy=recovery_policy,
             extra_obs_extractor=get_observation,
-            input_file="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
+            input_file=args.demonstration_set_file,
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
             q_learning=True,
@@ -293,6 +298,28 @@ if __name__ == "__main__":
     parser.add_argument(
         "--targetrate", type=float, default=0.01, help="target context switching rate"
     )
+
+    parser.add_argument(
+        "--expert_policy_file",
+        type=str,
+        default="models/model_epoch_2000_low_dim_v15_success_0.5.pth",
+        help="filepath to expert policy pth file",
+    )
+
+    parser.add_argument(
+        "--recovery_policy_file",
+        type=str,
+        default="models/model_epoch_1000.pth",
+        help="filepath to recovery policy pth file",
+    )
+
+    parser.add_argument(
+        "--demonstration_set_file",
+        type=str,
+        default="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
+        help="filepath to expert data pkl file",
+    )
+
     parser.add_argument(
         "--max_expert_query",
         type=int,

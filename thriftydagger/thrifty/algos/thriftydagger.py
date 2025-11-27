@@ -164,7 +164,7 @@ class QReplayBuffer:
 def generate_offline_data(
     env,
     expert_policy,
-    suboptimal_policy=None,
+    recovery_policy=None,
     num_episodes=0,
     output_file="data.pkl",
     robosuite=False,
@@ -179,8 +179,8 @@ def generate_offline_data(
     while i < num_episodes:
         print("Episode #{}".format(i))
         expert_policy.start_episode()
-        if suboptimal_policy:
-            suboptimal_policy.start_episode()  # NOTE: 為啥會有這？ by AaW
+        if recovery_policy:
+            recovery_policy.start_episode()  # NOTE: 為啥會有這？ by AaW
         o, total_ret, d, t = env.reset(), 0, False, 0
         curr_obs, curr_act = [], []
         # if robosuite:
@@ -481,7 +481,7 @@ def thrifty(
     input_file="data.pkl",
     device_idx=0,
     expert_policy=None,
-    suboptimal_policy=None,
+    recovery_policy=None,
     extra_obs_extractor=None,
     num_nets=5,
     target_rate=0.01,
@@ -613,7 +613,7 @@ def thrifty(
         obs, act, done, rew = [], [], [], []
         for j in range(num_test_episodes):
             expert_policy.start_episode()
-            suboptimal_policy.start_episode()
+            recovery_policy.start_episode()
             o, d, ep_ret, ep_ret2, ep_len = env.reset(), False, 0, 0, 0
             while not d:
                 obs.append(o)
@@ -680,7 +680,7 @@ def thrifty(
 
         while i < obs_per_iter:
             expert_policy.start_episode()
-            suboptimal_policy.start_episode()
+            recovery_policy.start_episode()
             o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
 
             obs, act, rew, done, sup, var, risk = (
@@ -730,33 +730,33 @@ def thrifty(
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
 
                 elif safety_mode:
-                    a_suboptimal_policy = suboptimal_policy(
+                    a_recovery_policy = recovery_policy(
                         extra_obs_extractor(env, env.env.env.latest_obs_dict)
                     )
-                    a_suboptimal_policy = np.clip(
-                        a_suboptimal_policy, -act_limit, act_limit
+                    a_recovery_policy = np.clip(
+                        a_recovery_policy, -act_limit, act_limit
                     )
-                    replay_buffer.store(o, a_suboptimal_policy)
-                    risk.append(ac.safety(o, a_suboptimal_policy))
+                    replay_buffer.store(o, a_recovery_policy)
+                    risk.append(ac.safety(o, a_recovery_policy))
 
-                    if (hg_dagger and a_suboptimal_policy[3] != 0) or (
+                    if (hg_dagger and a_recovery_policy[3] != 0) or (
                         not hg_dagger
-                        and sum((a - a_suboptimal_policy) ** 2) < switch2robot_thresh
+                        and sum((a - a_recovery_policy) ** 2) < switch2robot_thresh
                         and (not q_learning or ac.safety(o, a) > switch2robot_thresh2)
                     ):
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
-                        o2, _, d, _ = env.step(a_suboptimal_policy)
+                        o2, _, d, _ = env.step(a_recovery_policy)
                     else:
-                        o2, _, d, _ = env.step(a_suboptimal_policy)
+                        o2, _, d, _ = env.step(a_recovery_policy)
 
-                    act.append(a_suboptimal_policy)
+                    act.append(a_recovery_policy)
                     sup.append(1)
                     s = env._check_success()
                     qbuffer.store(
                         o,
-                        a_suboptimal_policy,
+                        a_recovery_policy,
                         o2,
                         int(s),
                         (ep_len + 1 >= horizon) or s,
