@@ -1,28 +1,40 @@
-# Script for running ThriftyDAgger
-from thrifty.algos.thriftydagger import thrifty, generate_offline_data
-from thrifty.algos.lazydagger import lazy
-from thrifty.utils.run_utils import setup_logger_kwargs
-import gymnasium
-import torch
-import robosuite as suite
-from robosuite.controllers import load_composite_controller_config
+# run_thriftydagger.py
+# Script for running ThriftyDAgger on robosuite environments
 
-# FIXME: commented out to disable MJGUI-related behavior
-# from robosuite.devices.mjgui import MJGUI
-from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
-from robosuite.wrappers import VisualizationWrapper
-from robosuite.wrappers import GymWrapper
+# --------------------------------------------------------------
+# Imports
+# --------------------------------------------------------------
 
-# from robosuite.devices import Keyboard
+# standard libraries
 import numpy as np
 import sys
 import time
+import torch
 import wandb
 
-from thrifty.robomimic_expert import RobomimicExpert
+# robosuite
+import robosuite as suite
+from robosuite.controllers import load_composite_controller_config
+from robosuite.wrappers import VisualizationWrapper
+from robosuite.wrappers import GymWrapper
+
+# FIXME: commented out to disable MJGUI-related behavior
+# from robosuite.devices.mjgui import MJGUI
+# from robosuite.devices import Keyboard
+
+# robomimic
 import robomimic.utils.obs_utils as ObsUtils
 import robomimic.utils.lang_utils as LangUtils
 from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoint
+
+# thriftydagger
+from thrifty.algos.thriftydagger import thrifty, generate_offline_data
+from thrifty.algos.lazydagger import lazy
+from thrifty.utils.run_utils import setup_logger_kwargs
+from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
+from thrifty.robomimic_expert import RobomimicExpert
+from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
+
 
 # 這裡用你搬到比較短路徑的 expert model
 # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
@@ -98,180 +110,174 @@ def get_observation(env, di):
     return ret
 
 
-class ObsCachingWrapper:
+class HumanExpertPolicy:
     """
-    Lightweight wrapper that caches raw robosuite dict observations.
-    Not a Gymnasium wrapper because the base robosuite env is not a Gym Env.
+    把原本 human_expert_pol(o) 包成一個物件：
+    - 建構時綁定 env / active_robot / arm / config
+    - 呼叫時 signature 還是 (obs) -> action
     """
 
-    def __init__(self, env):
+    def __init__(self, env, active_robot, arm="right", config="single-arm-opposed"):
         self.env = env
-        self.latest_obs_dict = None
+        self.active_robot = active_robot
+        self.arm = arm
+        self.config = config
+        # self.input_device = Keyboard(...) 如果你之後要真的用 keyboard，可以放在這
 
-    def reset(self, **kwargs):
-        obs = self.env.reset(**kwargs)
-        self.latest_obs_dict = obs
-        return obs
-
-    def step(self, action):
-        result = self.env.step(action)
-        if isinstance(result, tuple) and len(result) == 5:
-            obs, reward, terminated, truncated, info = result
-            done = terminated or truncated
+    def __call__(self, obs):
+        env = self.env
+        a = np.zeros(7)
+        if env.gripper_closed:
+            a[-1] = 1.0
+            # self.input_device.grasp = True
         else:
-            obs, reward, done, info = result
-        self.latest_obs_dict = obs
-        return obs, reward, done, info
+            a[-1] = -1.0
+            # self.input_device.grasp = False
 
-    def __getattr__(self, name):
-        return getattr(self.env, name)
+        a_ref = a.copy()
+        # pause simulation if there is no user input (instead of recording a no-op)
+        while np.array_equal(a, a_ref):
+            # FIXME: commented out to disable MJGUI-related behavior
+            # a, _ = MJGUI.input2action(
+            #     device=self.input_device,
+            #     robot=self.active_robot,
+            #     active_arm=self.arm,
+            #     env_configuration=self.config,
+            # )
+            env.render()
+            time.sleep(0.001)
+        return a
 
 
-class CustomWrapper(gymnasium.Env):
-    def __init__(self, env, render):
+class HgDaggerWaiter:
+    """
+    把原本 hg_dagger_wait() 包成 callable 物件：
+    - 不吃參數
+    - 執行時可以存取 env / active_robot / arm / config
+    """
+
+    def __init__(self, env, active_robot, arm="right", config="single-arm-opposed"):
         self.env = env
-        self.observation_space = env.observation_space
-        self.action_space = env.action_space
-        self.gripper_closed = False
-        self.viewer = env.viewer
-        self.robots = env.robots
-        self._render = render
+        self.active_robot = active_robot
+        self.arm = arm
+        self.config = config
+        # self.input_device = Keyboard(...) 如果需要
 
-    def _step(self, action):
-        """
-        Normalize step outputs to (obs, reward, done, info) even if the base env
-        follows the Gymnasium API and returns terminated/truncated separately.
-        """
-        result = self.env.step(action)
-        if isinstance(result, tuple) and len(result) == 5:
-            obs, reward, terminated, truncated, info = result
-            done = terminated or truncated
-            return obs, reward, done, info
-        return result
-
-    def reset(self):
-        res = self.env.reset()  # o ?O obs ?V?q (23,)
-        o = res[0] if isinstance(res, tuple) else res
-        self.render()
-        settle_action = np.zeros(7)
-        settle_action[-1] = -1
-        for _ in range(10):
-            o, r, d, info = self._step(settle_action)
-            # print(o, r, d, info)  # ?u???n debug ?A?L
-            self.render()
-        self.gripper_closed = False
-        return o
-
-    def step(self, action):
-        # abstract 10 actions as 1 action
-        # get rid of x/y rotation, which is unintuitive for remote teleop
-        action_ = action.copy()
-        action_[3] = 0.0
-        action_[4] = 0.0
-        self._step(action_)
-        self.render()
-        settle_action = np.zeros(7)
-        settle_action[-1] = action[-1]
-        for _ in range(10):
-            r1, r2, r3, r4 = self._step(settle_action)
-            self.render()
-        if action[-1] > 0:
-            self.gripper_closed = True
-        else:
-            self.gripper_closed = False
-        return r1, r2, r3, r4
-
-    def _check_success(self):
-        return self.env._check_success()
-
-    def render(self):
-        if self._render:
-            self.env.render()
+    def __call__(self):
+        # for HG-dagger, repurpose the 'Z' key (action elem 3) for starting/ending interaction
+        # FIXME: commented out to disable MJGUI-related behavior
+        # for _ in range(10):
+        #     a, _ = MJGUI.input2action(
+        #         device=self.input_device,
+        #         robot=self.active_robot,
+        #         active_arm=self.arm,
+        #         env_configuration=self.config,
+        #     )
+        #     self.env.render()
+        #     time.sleep(0.001)
+        #     if a[3] != 0:  # z is pressed
+        #         break
+        # return a[3] != 0
+        pass
 
 
-if __name__ == "__main__":
-    import argparse
+def build_robosuite_config(args):
+    """
+    負責決定 env_name / robots / controller_configs
+    """
+    if args.environment == "Square":
+        robosuite_env_name = "NutAssemblySquare"
+        robots = "Panda"
+    else:
+        robosuite_env_name = args.environment
+        robots = "UR5e"
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("exp_name", type=str)
-    parser.add_argument("--seed", "-s", type=int, default=0)
-    parser.add_argument("--device", type=int, default=-1)
-    parser.add_argument(
-        "--gen_data",
-        action="store_true",
-        help="True if you want to collect offline human demos",
+    controller_configs = {
+        "type": "BASIC",
+        "body_parts": {
+            "right": {
+                "type": "OSC_POSE",
+                "input_max": 1,
+                "input_min": -1,
+                "output_max": [0.05, 0.05, 0.05, 0.5, 0.5, 0.5],
+                "output_min": [-0.05, -0.05, -0.05, -0.5, -0.5, -0.5],
+                "kp": 150,
+                "damping_ratio": 1,
+                "impedance_mode": "fixed",
+                "kp_limits": [0, 300],
+                "damping_ratio_limits": [0, 10],
+                "position_limits": None,
+                "orientation_limits": None,
+                "uncouple_pos_ori": True,
+                "input_type": "delta",
+                "input_ref_frame": "base",
+                "interpolation": None,
+                "ramp_ratio": 0.2,
+                "gripper": {"type": "GRIP"},
+            }
+        },
+    }
+
+    return {
+        "env_name": robosuite_env_name,
+        "robots": robots,
+        "controller_configs": controller_configs,
+    }
+
+
+def create_env(config, render, maybe_expert_pol=None):
+    """
+    建立 robosuite env + wrapper，回傳 (env, active_robot, robosuite_cfg)
+
+    maybe_expert_pol: 如果是 RobomimicExpert，就在這裡綁 env。
+    """
+    env = suite.make(
+        **config,
+        has_renderer=render,
+        has_offscreen_renderer=False,
+        render_camera="agentview",
+        ignore_done=True,
+        use_camera_obs=False,  # low_dim expert，不用影像
+        reward_shaping=True,
+        control_freq=20,
+        hard_reset=True,
+        use_object_obs=True,
     )
-    parser.add_argument(
-        "--iters", type=int, default=5, help="number of DAgger-style iterations"
+
+    obs_cacher = ObsCachingWrapper(env)
+    if isinstance(maybe_expert_pol, RobomimicExpert):
+        print("Binding environment wrapper to RobomimicExpert...")
+        maybe_expert_pol.set_env(obs_cacher)
+
+    env = GymWrapper(
+        obs_cacher,
+        keys=[
+            "robot0_eef_pos",
+            "robot0_eef_quat",
+            "robot0_gripper_qpos",
+            "object",
+        ],
     )
-    parser.add_argument(
-        "--targetrate", type=float, default=0.01, help="target context switching rate"
-    )
-    parser.add_argument(
-        "--max_expert_query",
-        type=int,
-        default=2000,
-        help="maximum number of expert queries allowed",
-    )
-    # 你可以下 --environment Square，就會自動用 NutAssemblySquare + Panda
-    parser.add_argument("--environment", type=str, default="NutAssembly")
-    parser.add_argument("--no_render", action="store_true")
-    parser.add_argument("--hgdagger", action="store_true")
-    parser.add_argument("--lazydagger", action="store_true")
-    parser.add_argument(
-        "--eval",
-        type=str,
-        default=None,
-        help="filepath to saved pytorch model to initialize weights",
-    )
-    parser.add_argument(
-        "--algo_sup", action="store_true", help="use an algorithmic supervisor"
-    )
-    args = parser.parse_args()
+    env = VisualizationWrapper(env, indicator_configs=None)
+    env = CustomWrapper(env, render=render)
+
+    arm = "right"
+    config_name = "single-arm-opposed"
+    active_robot = env.robots[arm == "left"]  # 與你原來邏輯一致
+
+    robosuite_cfg = {"MAX_EP_LEN": 175}
+    return env, active_robot, arm, config_name, robosuite_cfg
+
+
+def main(args):
     render = not args.no_render
 
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
 
-    # ---- 決定 robosuite env 名字 & 機器人型號 ----
-    if args.environment == "Square":
-        # 我們的 Square 任務，其實是 robosuite 的 NutAssemblySquare，用 Panda
-        robosuite_env_name = "NutAssemblySquare"
-        robots = "Panda"
-    else:
-        # 其他情況就直接用 args.environment
-        robosuite_env_name = args.environment
-        robots = "UR5e"
+    # ---- robosuite config ----
+    config = build_robosuite_config(args)
 
-    # 共用的 config
-    config = {
-        "env_name": robosuite_env_name,
-        "robots": robots,
-        "controller_configs": {
-            "type": "BASIC",
-            "body_parts": {
-                "right": {
-                    "type": "OSC_POSE",
-                    "input_max": 1,
-                    "input_min": -1,
-                    "output_max": [0.05, 0.05, 0.05, 0.5, 0.5, 0.5],
-                    "output_min": [-0.05, -0.05, -0.05, -0.5, -0.5, -0.5],
-                    "kp": 150,
-                    "damping_ratio": 1,
-                    "impedance_mode": "fixed",
-                    "kp_limits": [0, 300],
-                    "damping_ratio_limits": [0, 10],
-                    "position_limits": None,
-                    "orientation_limits": None,
-                    "uncouple_pos_ori": True,
-                    "input_type": "delta",
-                    "input_ref_frame": "base",
-                    "interpolation": None,
-                    "ramp_ratio": 0.2,
-                    "gripper": {"type": "GRIP"},
-                }
-            },
-        },
-    }
+    # ---- wandb ----
     wandb.init(
         entity="aawrail-RL2025",
         project="final_project_exp0",
@@ -298,110 +304,44 @@ if __name__ == "__main__":
         },
     )
 
-    # 建立 robosuite 環境
-    env = suite.make(
-        **config,
-        has_renderer=render,
-        has_offscreen_renderer=False,
-        render_camera="agentview",
-        ignore_done=True,
-        use_camera_obs=False,  # low_dim expert，不用影像
-        reward_shaping=True,
-        control_freq=20,
-        hard_reset=True,
-        use_object_obs=True,
+    # ---- 建 env（這裡 maybe_expert_pol 如果你有事先 load，可以傳進去）----
+    # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
+    try:
+        maybe_expert_pol = expert_pol  # 如果沒有就註解掉，改成 None
+    except NameError:
+        maybe_expert_pol = None
+
+    env, active_robot, arm_, config_, robosuite_cfg = create_env(
+        config, render, maybe_expert_pol=maybe_expert_pol
     )
 
-    obs_cacher = ObsCachingWrapper(env)
-    if isinstance(expert_pol, RobomimicExpert):
-        print("Binding environment wrapper to RobomimicExpert...")
-        expert_pol.set_env(obs_cacher)
-    env = GymWrapper(
-        obs_cacher,
-        keys=[
-            "robot0_eef_pos",
-            "robot0_eef_quat",
-            "robot0_gripper_qpos",
-            "object",
-        ],
-    )
-    env = VisualizationWrapper(env, indicator_configs=None)
-    env = CustomWrapper(env, render=render)
+    # ---- 建 hg_dagger_wait / human_expert_pol ----
+    hg_dagger_wait = HgDaggerWaiter(env, active_robot, arm_, config_)
+    human_expert = HumanExpertPolicy(env, active_robot, arm_, config_)
 
-    arm_ = "right"
-    config_ = "single-arm-opposed"
-    # input_device = Keyboard(env, pos_sensitivity=0.5, rot_sensitivity=3.0)
-    if render:
-        pass
-        # env.viewer.add_keypress_callback(input_device.on_press)
-        # env.viewer.add_keyup_callback(input_device.on_release)
-        # env.viewer.add_keyrepeat_callback(input_device.on_press)
-    active_robot = env.robots[arm_ == "left"]
-
-    def hg_dagger_wait():
-        # for HG-dagger, repurpose the 'Z' key (action elem 3) for starting/ending interaction
-        # FIXME: commented out to disable MJGUI-related behavior
-        # for _ in range(10):
-        #     a, _ = MJGUI.input2action(
-        #         device=input_device,
-        #         robot=active_robot,
-        #         active_arm=arm_,
-        #         env_configuration=config_,
-        #     )
-        #     env.render()
-        #     time.sleep(0.001)
-        #     if a[3] != 0:  # z is pressed
-        #         break
-        # return a[3] != 0
-        pass
-
-    def human_expert_pol(o):
-        a = np.zeros(7)
-        if env.gripper_closed:
-            a[-1] = 1.0
-            # input_device.grasp = (
-            #     True  # TODO: find how to alter input_device.grasp to newer robosuite
-            # )
-        else:
-            a[-1] = -1.0
-            # input_device.grasp = (
-            #     False  # TODO: find how to alter input_device.grasp to newer robosuite
-            # )
-        a_ref = a.copy()
-        # pause simulation if there is no user input (instead of recording a no-op)
-        while np.array_equal(a, a_ref):
-            # FIXME: commented out to disable MJGUI-related behavior
-            # a, _ = MJGUI.input2action(
-            #     device=input_device,
-            #     robot=active_robot,
-            #     active_arm=arm_,
-            #     env_configuration=config_,
-            # )
-            env.render()
-            time.sleep(0.001)
-        return a
-
-    robosuite_cfg = {"MAX_EP_LEN": 175}  # "INPUT_DEVICE": input_device}
-
-    # 根據參數決定要用哪一種 expert
+    # ---- 決定 expert_pol ----
     if args.algo_sup:
-        expert_pol = HardcodedPolicy(env).act
+        expert = HardcodedPolicy(env).act
     elif args.hgdagger:
-        expert_pol = human_expert_pol
-    # 否則就用一開始載進來的 robomimic expert_pol
+        expert = human_expert
+    else:
+        # robomimic expert 已在外面準備好，這裡直接拿來用
+        expert = maybe_expert_pol
 
+    # ---- 如果要先收 offline data ----
     if args.gen_data:
         NUM_BC_EPISODES = 30
         generate_offline_data(
             env,
-            expert_policy=expert_pol,
+            expert_policy=expert,
             num_episodes=NUM_BC_EPISODES,
             seed=args.seed,
-            output_file="robosuite-{}.pkl".format(NUM_BC_EPISODES),
+            output_file=f"robosuite-{NUM_BC_EPISODES}.pkl",
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
         )
 
+    # ---- 主訓練流程 ----
     try:
         if args.hgdagger:
             thrifty(
@@ -411,12 +351,12 @@ if __name__ == "__main__":
                 device_idx=args.device,
                 target_rate=args.targetrate,
                 seed=args.seed,
-                expert_policy=expert_pol,
+                expert_policy=expert,
                 input_file="robosuite-30.pkl",
                 robosuite=True,
                 robosuite_cfg=robosuite_cfg,
                 num_nets=1,
-                hg_dagger=hg_dagger_wait,
+                hg_dagger=hg_dagger_wait,  # 這裡直接給 callable 物件
                 init_model=args.eval,
                 max_expert_query=args.max_expert_query,
             )
@@ -428,7 +368,7 @@ if __name__ == "__main__":
                 device_idx=args.device,
                 noise=0.0,
                 seed=args.seed,
-                expert_policy=expert_pol,
+                expert_policy=expert,
                 input_file="robosuite-30.pkl",
                 robosuite=True,
                 robosuite_cfg=robosuite_cfg,
@@ -441,7 +381,7 @@ if __name__ == "__main__":
                 device_idx=args.device,
                 target_rate=args.targetrate,
                 seed=args.seed,
-                expert_policy=expert_pol,
+                expert_policy=expert,
                 suboptimal_policy=suboptimal_policy,
                 extra_obs_extractor=get_observation,
                 input_file="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
@@ -453,3 +393,45 @@ if __name__ == "__main__":
             )
     finally:
         wandb.finish()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("exp_name", type=str)
+    parser.add_argument("--seed", "-s", type=int, default=0)
+    parser.add_argument("--device", type=int, default=-1)
+    parser.add_argument(
+        "--gen_data",
+        action="store_true",
+        help="True if you want to collect offline human demos",
+    )
+    parser.add_argument(
+        "--iters", type=int, default=5, help="number of DAgger-style iterations"
+    )
+    parser.add_argument(
+        "--targetrate", type=float, default=0.01, help="target context switching rate"
+    )
+    parser.add_argument(
+        "--max_expert_query",
+        type=int,
+        default=2000,
+        help="maximum number of expert queries allowed",
+    )
+    parser.add_argument("--environment", type=str, default="NutAssembly")
+    parser.add_argument("--no_render", action="store_true")
+    parser.add_argument("--hgdagger", action="store_true")
+    parser.add_argument("--lazydagger", action="store_true")
+    parser.add_argument(
+        "--eval",
+        type=str,
+        default=None,
+        help="filepath to saved pytorch model to initialize weights",
+    )
+    parser.add_argument(
+        "--algo_sup", action="store_true", help="use an algorithmic supervisor"
+    )
+    args = parser.parse_args()
+
+    main(args)
