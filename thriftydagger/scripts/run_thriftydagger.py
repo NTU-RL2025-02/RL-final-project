@@ -201,7 +201,7 @@ def main(args):
     )
 
     recovery_policy, _ = policy_from_checkpoint(
-        device=device
+        device=device,
         ckpt_path="models/model_epoch_1000.pth",
     )
 
@@ -226,6 +226,7 @@ def main(args):
             "max_expert_query": args.max_expert_query,
             "algo": ("thrifty_q" if True else "thrifty"),
             "expert_policy_file": args.expert_policy_file,
+            "recovery_policy_file": args.recovery_policy_file,
             "demonstration_set_file": args.demonstration_set_file,
             "gen_data": args.gen_data,
             "controller_configs": config["controller_configs"],
