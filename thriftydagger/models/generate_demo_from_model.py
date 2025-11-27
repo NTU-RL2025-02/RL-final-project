@@ -207,6 +207,8 @@ env = GymWrapper(
 env = VisualizationWrapper(env, indicator_configs=None)
 env = CustomWrapper(env, render=False)
 
+raw_env = obs_cacher 
+
 
 # model_name = "model_epoch_2000_low_dim_v15_success_0.5"
 # expert_pol = RobomimicExpert(
@@ -229,7 +231,10 @@ while ep <= 10:
     # o_ref, done_ref = env_ref.reset(), False
     step = 0
     while not done and len(ep_obs) < 300:
-        a = policy(get_observation(env, env.env.observation_spec()))  # important
+        # a = policy(get_observation(env, env.env.observation_spec()))  # important
+        curr_raw_obs = obs_cacher.latest_obs_dict
+        obs_for_policy = get_observation(raw_env, curr_raw_obs)
+        a = policy(obs_for_policy)
         ep_obs.append(o)
         ep_act.append(a)
         o, r, sys_done, info = env.step(a)

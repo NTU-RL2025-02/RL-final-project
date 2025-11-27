@@ -1,7 +1,6 @@
 *.*~
 __pycache__/
 *.pkl
-*.pth
 data/
 dist/
 **/*.egg-info
