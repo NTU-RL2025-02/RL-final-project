@@ -34,6 +34,7 @@ setup(
         "robosuite_models",
         "black",
         "wandb",
+        "DeepDiff",
     ],
     description="Code for ThriftyDAgger.",
     author="Ryan Hoque",
