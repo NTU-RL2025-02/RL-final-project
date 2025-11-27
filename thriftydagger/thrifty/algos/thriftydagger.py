@@ -487,7 +487,6 @@ def thrifty(
     target_rate=0.01,
     robosuite=False,
     robosuite_cfg=None,
-    hg_dagger=None,
     q_learning=False,
     gamma=0.9999,
     init_model=None,
@@ -499,7 +498,6 @@ def thrifty(
     input_file: where initial BC data is stored (output of generate_offline_data())
     target_rate: desired rate of context switching
     robosuite: whether to enable robosuite specific code (and use robosuite_cfg)
-    hg_dagger: if not None, use this function as the switching condition (i.e. run HG-DAgger)
     q_learning: if True, train Q_risk safety critic
     gamma: discount factor for Q-learning
     num_test_episodes: run this many episodes after each iter without interventions
@@ -712,10 +710,8 @@ def thrifty(
                     online_burden += 1
                     risk.append(ac.safety(o, a_expert))
 
-                    if (hg_dagger and a_expert[3] != 0) or (
-                        not hg_dagger
-                        and sum((a - a_expert) ** 2) < switch2robot_thresh
-                        and (not q_learning or ac.safety(o, a) > switch2robot_thresh2)
+                    if sum((a - a_expert) ** 2) < switch2robot_thresh and (
+                        not q_learning or ac.safety(o, a) > switch2robot_thresh2
                     ):
                         print("Switch to Robot")
                         expert_mode = False
@@ -739,10 +735,8 @@ def thrifty(
                     replay_buffer.store(o, a_recovery_policy)
                     risk.append(ac.safety(o, a_recovery_policy))
 
-                    if (hg_dagger and a_recovery_policy[3] != 0) or (
-                        not hg_dagger
-                        and sum((a - a_recovery_policy) ** 2) < switch2robot_thresh
-                        and (not q_learning or ac.safety(o, a) > switch2robot_thresh2)
+                    if sum((a - a_recovery_policy) ** 2) < switch2robot_thresh and (
+                        not q_learning or ac.safety(o, a) > switch2robot_thresh2
                     ):
                         print("Switch to Robot")
                         safety_mode = False
@@ -762,19 +756,13 @@ def thrifty(
                         (ep_len + 1 >= horizon) or s,
                     )
 
-                elif (hg_dagger and hg_dagger()) or (
-                    not hg_dagger and ac.variance(o) > switch2human_thresh
-                ):
+                elif ac.variance(o) > switch2human_thresh:
                     print("Switch to Human (Novel)")
                     num_switch_to_human += 1
                     expert_mode = True
                     continue
 
-                elif (
-                    not hg_dagger
-                    and q_learning
-                    and ac.safety(o, a) < switch2human_thresh2
-                ):
+                elif q_learning and ac.safety(o, a) < switch2human_thresh2:
                     print("Switch to Human (Risk)")
                     num_switch_to_human2 += 1
                     safety_mode = True
