@@ -38,7 +38,6 @@ from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
 
 # 這裡用你搬到比較短路徑的 expert model
 # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
-
 expert_pol, _ = policy_from_checkpoint(
     device="cuda" if torch.cuda.is_available() else "cpu",
     ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth",
@@ -114,10 +113,13 @@ def build_robosuite_config(args):
     """
     負責決定 env_name / robots / controller_configs
     """
+    # ---- 決定 robosuite env 名字 & 機器人型號 ----
     if args.environment == "Square":
+        # 我們的 Square 任務，其實是 robosuite 的 NutAssemblySquare，用 Panda
         robosuite_env_name = "NutAssemblySquare"
         robots = "Panda"
     else:
+        # 其他情況就直接用 args.environment
         robosuite_env_name = args.environment
         robots = "UR5e"
 
@@ -225,10 +227,8 @@ def main(args):
         },
     )
 
-    # ---- 建 env（這裡 expert_pol 如果你有事先 load，可以傳進去）----
+    # ---- 建 env ----
     # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
-    expert_pol = None
-
     env, active_robot, arm_, config_, robosuite_cfg = create_env(
         config, render, expert_pol=expert_pol
     )
@@ -237,7 +237,6 @@ def main(args):
     if args.algo_sup:
         expert = HardcodedPolicy(env).act
     else:
-        # robomimic expert 已在外面準備好，這裡直接拿來用
         expert = expert_pol
 
     # ---- 如果要先收 offline data ----
