@@ -7,6 +7,8 @@ import robomimic.utils.lang_utils as LangUtils
 from robomimic.algo import algo_factory
 from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoint
 from thrifty.robomimic_expert import RobomimicExpert
+from copy import deepcopy
+from deepdiff import DeepDiff
 
 
 class ObsCachingWrapper:
@@ -149,6 +151,19 @@ def get_observation(env, di):
     return ret
 
 
+def get_real_depth_map(env, depth_map):
+    """
+    Reproduced from https://github.com/ARISE-Initiative/robosuite/blob/c57e282553a4f42378f2635b9a3cbc4afba270fd/robosuite/utils/camera_utils.py#L106
+    since older versions of robosuite do not have this conversion from normalized depth values returned by MuJoCo
+    to real depth values.
+    """
+    # Make sure that depth values are normalized
+    assert np.all(depth_map >= 0.0) and np.all(depth_map <= 1.0)
+    extent = env.sim.model.stat.extent
+    far = env.sim.model.vis.map.zfar * extent
+    near = env.sim.model.vis.map.znear * extent
+    return near / (1.0 - depth_map * (1.0 - near / far))
+
 robosuite_env_name = "NutAssemblySquare"
 robots = "Panda"
 config = {
@@ -220,7 +235,7 @@ raw_env = obs_cacher
 model_name = "model_epoch_2000_low_dim_v15_success_0.5"
 ckpt = f"models/{model_name}.pth"
 env_ref, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
-policy, _ = policy_from_checkpoint(device="cuda", ckpt_dict=ckpt_dict)
+policy, _ = policy_from_checkpoint(device="cpu", ckpt_dict=ckpt_dict)
 
 obs_list, act_list = [], []
 ep = 1
@@ -228,31 +243,46 @@ while ep <= 10:
     ep_obs, ep_act = [], []
     policy.start_episode()  # important
     o, done = env.reset(), False
-    # o_ref, done_ref = env_ref.reset(), False
+    o_ref, done_ref = env_ref.reset(), False
+    # print(f"raw robosuite: {obs_cacher.latest_obs_dict}")
+    # print(f"observation from thrifty dagger: {o}")
+    # print(f"observation from reference: {o_ref}")
+    # import sys
+    # sys.exits()
     step = 0
     while not done and len(ep_obs) < 300:
-        # a = policy(get_observation(env, env.env.observation_spec()))  # important
-        curr_raw_obs = obs_cacher.latest_obs_dict
-        obs_for_policy = get_observation(raw_env, curr_raw_obs)
-        a = policy(obs_for_policy)
-        ep_obs.append(o)
-        ep_act.append(a)
-        o, r, sys_done, info = env.step(a)
+        o_mid_old = get_observation(env=env, di=env.env.observation_spec())
+        a = policy(o_mid_old)  # important
+        a_ref = policy(o_ref)
+
+        # curr_raw_obs = obs_cacher.latest_obs_dict
+        # obs_for_policy = get_observation(raw_env, curr_raw_obs)
+        # a = policy(obs_for_policy)
+        # ep_obs.append(deepcopy(o))
+        # ep_act.append(deepcopy(a))
+
+        o, _r, _sys_done, _info = env.step(a)
         done = env._check_success()
 
-        # a_ref = policy(o_ref)
-        # o_ref, r, sys_done, info = env_ref.step(a_ref)
-        # done_ref = env_ref.is_success()['task']
-        # step += 1
-        # print(step)
-        # print(all(get_observation(env, env.env.observation_spec())) ==  all(o_ref))
-        # print(all(a) == all(a_ref))
-        # print(done == done_ref)
+        o_ref, _r, _sys_done, _info = env_ref.step(a_ref)
+        done_ref = env_ref.is_success()['task']
+    
+    
+        # ep_obs.append(o_ref)
+        # ep_act.append(a_ref)
+
+    
+        step += 1
+        print(step)
+        print("\033[32m OBS:" , DeepDiff(get_observation(env, env.env.observation_spec()), o_ref), "\033[0m")
+        print(DeepDiff(a, a_ref))
+        print(done == done_ref)
     print(f"{ep}: done={done}, episode length={len(ep_obs)}")
     if done:
         ep += 1
         obs_list.extend(ep_obs)
         act_list.extend(ep_act)
+        
 pickle.dump(
     {"obs": np.array(obs_list), "act": np.array(act_list)},
     open(f"models/{model_name}-30.pkl", "wb"),
