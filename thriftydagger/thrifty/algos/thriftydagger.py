@@ -13,12 +13,7 @@ import random
 
 def get_observation_for_thrifty_dagger(env):
     obs_dict = env.env.observation_spec()
-    return {
-        "robot0_eef_pos": obs_dict["robot0_eef_pos"],
-        "robot0_eef_quat": obs_dict["robot0_eef_quat"],
-        "robot0_gripper_qpos": obs_dict["robot0_gripper_qpos"],
-        "object": obs_dict["object-state"],
-    }
+    return np.concat([obs_dict['robot0_proprio-state'], obs_dict['object-state']])
 
 class ReplayBuffer:
     """
