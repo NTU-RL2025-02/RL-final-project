@@ -504,10 +504,10 @@ def thrifty(
 
                 if robosuite:
                     # robosuite 的 success / done 檢查
-                    d = (ep_len + 1 >= horizon) or env.is_success()['task']
-                    ep_ret2 += int(env.is_success()['task'])
+                    d = (ep_len + 1 >= horizon) or env._check_success()
+                    ep_ret2 += int(env._check_success())
                     done.append(d)
-                    rew.append(int(env.is_success()['task']))
+                    rew.append(int(env._check_success()))
                 ep_ret += r
                 ep_len += 1
             print("episode #{} success? {}".format(j, rew[-1]))
@@ -688,7 +688,7 @@ def thrifty(
                     act.append(a_expert)
                     sup.append(1)  # sup=1 表示這一步是 supervised (human/suboptimal)
                     # 檢查是否成功
-                    s = env.is_success()['task']
+                    s = env._check_success()
                     # 把這筆 transition 放進 Q buffer 供 Q-learning 使用
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
                 elif safety_mode:
@@ -720,7 +720,7 @@ def thrifty(
                         o2 = get_observation_for_thrifty_dagger(env)
                     act.append(a_suboptimal_policy)
                     sup.append(1)
-                    s = env.is_success()['task']
+                    s = env._check_success()
                     qbuffer.store(
                         o, a_suboptimal_policy, o2, int(s), (ep_len + 1 >= horizon) or s
                     )
@@ -752,7 +752,7 @@ def thrifty(
                     o = get_observation_for_thrifty_dagger(env)
                     act.append(a)
                     sup.append(0)  # sup=0 表示由 robot policy 產生
-                    s = env.is_success()['task']
+                    s = env._check_success()
                     # 即使是 robot policy，也把 transition 存進 Q buffer
                     qbuffer.store(o, a, o2, int(s), (ep_len + 1 >= horizon) or s)
                 # robosuite 的 done 判定：episode 長度到 horizon 或成功
