@@ -141,6 +141,129 @@ def update_q(ac, ac_targ, q_optimizer, data, gamma, timer):
     return loss_q.item()
 
 
+def pretrain_policies(
+    ac,
+    replay_buffer,
+    held_out_data,
+    grad_steps,
+    bc_epochs,
+    batch_size,
+    replay_size,
+    obs_dim,
+    act_dim,
+    device,
+    pi_lr,
+):
+    pass
+
+
+def test_agent(
+    expert_policy,
+    recovery_policy,
+    env,
+    ac,
+    num_test_episodes,
+    act_limit,
+    horizon,
+    robosuite,
+    logger_kwargs,
+    epoch=0,
+):
+    """Run test episodes"""
+    # 用目前 policy ac 在環境中跑 num_test_episodes 回合，不會做 intervention
+    obs, act, done, rew = [], [], [], []
+    for j in range(num_test_episodes):
+        # 每個 episode 開始前，同樣通知 expert / suboptimal policy
+        expert_policy.start_episode()
+        recovery_policy.start_episode()
+        o, d, ep_ret, ep_ret2, ep_len = env.reset(), False, 0, 0, 0
+        while not d:
+            obs.append(o)
+            # 用 ac.act 給出 action (ensemble 的決策)
+            a = ac.act(o)
+            a = np.clip(a, -act_limit, act_limit)
+            act.append(a)
+            o, r, d, _ = env.step(a)
+            if robosuite:
+                # robosuite 的 success / done 檢查
+                d = (ep_len + 1 >= horizon) or env._check_success()
+                ep_ret2 += int(env._check_success())
+                done.append(d)
+                rew.append(int(env._check_success()))
+            ep_ret += r
+            ep_len += 1
+        print("episode #{} success? {}".format(j, rew[-1]))
+        if robosuite:
+            env.close()
+    # 計算成功率 (成功定義依照環境的 success flag)
+    print("Test Success Rate:", sum(rew) / num_test_episodes)
+    # 將測試 rollouts 存到 test-rollouts.pkl 給 Q-learning 使用
+    pickle.dump(
+        {
+            "obs": np.stack(obs),
+            "act": np.stack(act),
+            "done": np.array(done),
+            "rew": np.array(rew),
+        },
+        open("test-rollouts.pkl", "wb"),
+    )
+    # 同時也存一份到 output_dir，用 epoch 編號
+    pickle.dump(
+        {
+            "obs": np.stack(obs),
+            "act": np.stack(act),
+            "done": np.array(done),
+            "rew": np.array(rew),
+        },
+        open(logger_kwargs["output_dir"] + "/test{}.pkl".format(epoch), "wb"),
+    )
+
+
+def pretrain_policies(
+    ac,
+    replay_buffer,
+    held_out_data,
+    grad_steps,
+    bc_epochs,
+    batch_size,
+    replay_size,
+    obs_dim,
+    act_dim,
+    device,
+    pi_lr,
+):
+    pi_optimizers = [Adam(ac.pis[i].parameters(), lr=pi_lr) for i in range(ac.num_nets)]
+
+    for i in range(ac.num_nets):
+        if ac.num_nets > 1:
+            print("Net #{}".format(i))
+            tmp_buffer = ReplayBuffer(
+                obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
+            )
+            for _ in range(replay_buffer.size):
+                idx = np.random.randint(replay_buffer.size)
+                tmp_buffer.store(replay_buffer.obs_buf[idx], replay_buffer.act_buf[idx])
+        else:
+            tmp_buffer = replay_buffer
+
+        for j in range(bc_epochs):
+            loss_pi = []
+            for _ in range(grad_steps):
+                batch = tmp_buffer.sample_batch(batch_size)
+                loss_pi.append(update_pi(ac, pi_optimizers[i], batch, i))
+
+            validation = []
+            for j in range(len(held_out_data["obs"])):
+                a_pred = ac.act(held_out_data["obs"][j], i=i)
+                a_sup = held_out_data["act"][j]
+                validation.append(sum(a_pred - a_sup) ** 2)
+
+            print("LossPi", sum(loss_pi) / len(loss_pi))
+            print("LossValid", sum(validation) / len(validation))
+
+    return pi_optimizers
+
+
 def thrifty(
     env,
     iters=5,
@@ -228,6 +351,7 @@ def thrifty(
         except TypeError:
             ac = torch.load(init_model, map_location=device).to(device)
         ac.device = device
+
     # 建立 target network (用來做 Q-learning 的 target)
     ac_targ = deepcopy(ac)
     for p in ac_targ.parameters():
@@ -273,102 +397,42 @@ def thrifty(
     # 從 BC 的離線資料初始化 Q buffer
     qbuffer.fill_buffer_from_BC(input_data)
 
-    # Prepare for interaction with environment
-    # online_burden: 對 human expert 請求 label 的總次數
-    online_burden = 0  # how many labels we get from supervisor
-    # num_switch_to_human: 因為 novelty (不確定性高) 而切換到 human 的次數
-    num_switch_to_human = 0  # context switches (due to novelty)
-    # num_switch_to_human2: 因為 risk (安全性低) 而切換到 human 的次數
-    num_switch_to_human2 = 0  # context switches (due to risk)
-    # num_switch_to_robot: 從 human / safety policy 切回 robot policy 的次數
-    num_switch_to_robot = 0
-
-    def test_agent(epoch=0):
-        """Run test episodes"""
-        # 用目前 policy ac 在環境中跑 num_test_episodes 回合，不會做 intervention
-        obs, act, done, rew = [], [], [], []
-        for j in range(num_test_episodes):
-            # 每個 episode 開始前，同樣通知 expert / suboptimal policy
-            expert_policy.start_episode()
-            recovery_policy.start_episode()
-            o, d, ep_ret, ep_ret2, ep_len = env.reset(), False, 0, 0, 0
-            while not d:
-                obs.append(o)
-                # 用 ac.act 給出 action (ensemble 的決策)
-                a = ac.act(o)
-                a = np.clip(a, -act_limit, act_limit)
-                act.append(a)
-                o, r, d, _ = env.step(a)
-                if robosuite:
-                    # robosuite 的 success / done 檢查
-                    d = (ep_len + 1 >= horizon) or env._check_success()
-                    ep_ret2 += int(env._check_success())
-                    done.append(d)
-                    rew.append(int(env._check_success()))
-                ep_ret += r
-                ep_len += 1
-            print("episode #{} success? {}".format(j, rew[-1]))
-            if robosuite:
-                env.close()
-        # 計算成功率 (成功定義依照環境的 success flag)
-        print("Test Success Rate:", sum(rew) / num_test_episodes)
-        # 將測試 rollouts 存到 test-rollouts.pkl 給 Q-learning 使用
-        pickle.dump(
-            {
-                "obs": np.stack(obs),
-                "act": np.stack(act),
-                "done": np.array(done),
-                "rew": np.array(rew),
-            },
-            open("test-rollouts.pkl", "wb"),
-        )
-        # 同時也存一份到 output_dir，用 epoch 編號
-        pickle.dump(
-            {
-                "obs": np.stack(obs),
-                "act": np.stack(act),
-                "done": np.array(done),
-                "rew": np.array(rew),
-            },
-            open(logger_kwargs["output_dir"] + "/test{}.pkl".format(epoch), "wb"),
-        )
-
     # 若 iters=0，表示只做 evaluation，不做訓練
     if iters == 0 and num_test_episodes > 0:  # only run evaluation.
-        test_agent(0)
+        test_agent(
+            expert_policy,
+            recovery_policy,
+            env,
+            ac,
+            num_test_episodes,
+            act_limit,
+            horizon,
+            robosuite,
+            logger_kwargs,
+            epoch=0,
+        )
         sys.exit(0)
 
-    ##############################################
-    # ====== Pre-training with offline data ======
-    ###############################################
-    # 先用 BC 在 offline data 上訓練每個 policy (ensemble)
-    for i in range(ac.num_nets):
-        if ac.num_nets > 1:  # create new datasets via sampling with replacement
-            # 對於 ensemble，使用 bootstrap resampling 形成不同 training set
-            print("Net #{}".format(i))
-            tmp_buffer = ReplayBuffer(
-                obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
-            )
-            for _ in range(replay_buffer.size):
-                idx = np.random.randint(replay_buffer.size)
-                tmp_buffer.store(replay_buffer.obs_buf[idx], replay_buffer.act_buf[idx])
-        else:
-            # 單一 policy 就直接用 replay_buffer
-            tmp_buffer = replay_buffer
-        # 進行 bc_epochs 次 epoch，每個 epoch 做 grad_steps 次 update
-        for j in range(bc_epochs):
-            loss_pi = []
-            for _ in range(grad_steps):
-                batch = tmp_buffer.sample_batch(batch_size)
-                loss_pi.append(update_pi(ac, pi_optimizers[i], batch, i))
-            # 驗證集上的 validation loss，用 held_out_data 計算
-            validation = []
-            for j in range(len(held_out_data["obs"])):
-                a_pred = ac.act(held_out_data["obs"][j], i=i)
-                a_sup = held_out_data["act"][j]
-                validation.append(sum(a_pred - a_sup) ** 2)
-            print("LossPi", sum(loss_pi) / len(loss_pi))
-            print("LossValid", sum(validation) / len(validation))
+    # Pre-training with offline data
+    pi_optimizers = pretrain_policies(
+        ac,
+        replay_buffer,
+        held_out_data,
+        grad_steps,
+        bc_epochs,
+        batch_size,
+        replay_size,
+        obs_dim,
+        act_dim,
+        device,
+        pi_lr,
+    )
+
+    # Prepare for interaction with environment
+    online_burden = 0  # how many labels we get from supervisor
+    num_switch_to_human = 0  # context switches (due to novelty)
+    num_switch_to_human2 = 0  # context switches (due to risk)
+    num_switch_to_robot = 0  # switches back to robot
 
     # estimate switch-back parameter and initial switch-to parameter from data
     # 使用 offline data 估計 switch threshold：
