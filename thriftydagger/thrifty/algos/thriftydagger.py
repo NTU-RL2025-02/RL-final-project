@@ -314,27 +314,34 @@ def thrifty(
     init_model: initial NN weights
     """
 
-    # 建立 logger，用來記錄實驗超參與訓練過程 (progress.txt 等)
+    # ----------------------------------------------------------
+    # 1. 建立 logger 並存 config（不包含 env，避免 JSON 序列化問題）
+    # ----------------------------------------------------------
     logger = EpochLogger(**logger_kwargs)
     _locals = locals()
-    # config 中不存 env 這種無法 JSON 化的物件
-    del _locals["env"]
+    del _locals["env"]  # env 無法 JSON 化，從 config 中移除
     try:
         logger.save_config(_locals)
     except TypeError as e:
         # 某些不可序列化的物件會導致錯誤，這裡直接跳過
         print(f"[Warning] Could not save config as JSON: {e}")
 
+    # ----------------------------------------------------------
+    # 2. 裝置選擇與隨機種子
+    # ----------------------------------------------------------
     if device_idx >= 0 and torch.cuda.is_available():
         device = torch.device("cuda", device_idx)
     else:
         device = torch.device("cpu")
 
-    # 設定 random seed，確保實驗可重現
     torch.manual_seed(seed)
     np.random.seed(seed)
+
+    # ----------------------------------------------------------
+    # 3. robosuite 設定與環境基本資訊
+    # ----------------------------------------------------------
     if robosuite:
-        # 若是 robosuite，將環境的 model.xml 存到 output_dir 方便之後 replay
+        # 將 model.xml 存到 output_dir，方便之後 replay
         with open(os.path.join(logger_kwargs["output_dir"], "model.xml"), "w") as fh:
             fh.write(env.env.sim.model.get_xml())
 
@@ -342,16 +349,24 @@ def thrifty(
     obs_dim = env.observation_space.shape
     act_dim = env.action_space.shape[0]
     act_limit = env.action_space.high[0]
+
     # 確保 action space 是對稱的 [-act_limit, act_limit]
     assert act_limit == -1 * env.action_space.low[0], "Action space should be symmetric"
+
     # horizon: 每個 episode 最大長度 (由 robosuite_cfg 設定)
     horizon = robosuite_cfg["MAX_EP_LEN"]
 
-    # initialize actor and classifier NN
-    # 建立 Ensemble actor-critic (包含多個 policy 以及 Q-networks)
+    # ----------------------------------------------------------
+    # 4. 建立 actor-critic（ensemble）與 target network
+    # ----------------------------------------------------------
     ac = actor_critic(
-        env.observation_space, env.action_space, device, num_nets=num_nets, **ac_kwargs
+        env.observation_space,
+        env.action_space,
+        device,
+        num_nets=num_nets,
+        **ac_kwargs,
     )
+
     if init_model:
         # 若提供 init_model，則直接從檔案載入已訓練好的 ac
         try:
@@ -362,53 +377,66 @@ def thrifty(
             ac = torch.load(init_model, map_location=device).to(device)
         ac.device = device
 
-    # 建立 target network (用來做 Q-learning 的 target)
+    # target network（Q-learning 用）
     ac_targ = deepcopy(ac)
     for p in ac_targ.parameters():
-        # target network 不需要做 gradient 更新
-        p.requires_grad = False
+        p.requires_grad = False  # target network 不需要梯度
 
-    # Set up optimizers
-    # 為 ensemble 中每一個 policy 建立一個 optimizer
-    pi_optimizers = [Adam(ac.pis[i].parameters(), lr=pi_lr) for i in range(ac.num_nets)]
+    # ----------------------------------------------------------
+    # 5. Q-network optimizer 與 model saving 設定
+    # ----------------------------------------------------------
     # Q-network 使用同一個 optimizer，更新 q1, q2 兩個網路
     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
     q_optimizer = Adam(q_params, lr=pi_lr)
 
-    # Set up model saving
     # 告訴 logger 之後要儲存哪一個 PyTorch 模型 (ac)
     logger.setup_pytorch_saver(ac)
 
-    # Experience buffer
-    # 建立一個 ReplayBuffer，存 BC 資料以及後續 online 收集到的資料
+    # ----------------------------------------------------------
+    # 6. 建立 replay buffers 並載入 offline data
+    # ----------------------------------------------------------
+    # 行為克隆用 replay buffer（obs, act）
     replay_buffer = ReplayBuffer(
-        obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        size=replay_size,
+        device=device,
     )
-    # 載入離線 expert rollouts (由 generate_offline_data 產生)
+
+    # 載入離線 expert rollouts (由 generate_offline_data 產生的 data.pkl)
     input_data = pickle.load(open(input_file, "rb"))
-    # shuffle and create small held out set to check valid loss
+
+    # shuffle 並切出 held-out set 用於 validation / threshold estimation
     num_bc = len(input_data["obs"])
     idxs = np.arange(num_bc)
     np.random.shuffle(idxs)
-    # 前 90% 資料放進 replay buffer 當作 BC 訓練資料
+
+    # 前 90% 當作 BC 訓練資料
     replay_buffer.fill_buffer(
         input_data["obs"][idxs][: int(0.9 * num_bc)],
         input_data["act"][idxs][: int(0.9 * num_bc)],
     )
-    # 後 10% 當作 held-out set，用來估計 validation loss 與 threshold
+
+    # 後 10% 當作 held-out set
     held_out_data = {
         "obs": input_data["obs"][idxs][int(0.9 * num_bc) :],
         "act": input_data["act"][idxs][int(0.9 * num_bc) :],
     }
+
     # Q-replay buffer，用來訓練 safety critic (Qrisk)
     qbuffer = QReplayBuffer(
-        obs_dim=obs_dim, act_dim=act_dim, size=replay_size, device=device
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        size=replay_size,
+        device=device,
     )
     # 從 BC 的離線資料初始化 Q buffer
     qbuffer.fill_buffer_from_BC(input_data)
 
-    # 若 iters=0，表示只做 evaluation，不做訓練
-    if iters == 0 and num_test_episodes > 0:  # only run evaluation.
+    # ----------------------------------------------------------
+    # 7. 純 evaluation 模式（iters=0 且有設定 test episodes）
+    # ----------------------------------------------------------
+    if iters == 0 and num_test_episodes > 0:
         test_agent(
             expert_policy,
             recovery_policy,
@@ -423,7 +451,9 @@ def thrifty(
         )
         sys.exit(0)
 
-    # Pre-training with offline data
+    # ----------------------------------------------------------
+    # 8. 利用 offline data 先做 pre-training (BC)
+    # ----------------------------------------------------------
     pi_optimizers = pretrain_policies(
         ac,
         replay_buffer,
@@ -438,32 +468,34 @@ def thrifty(
         pi_lr,
     )
 
-    # Prepare for interaction with environment
-    online_burden = 0  # how many labels we get from supervisor
-    num_switch_to_human = 0  # context switches (due to novelty)
-    num_switch_to_human2 = 0  # context switches (due to risk)
-    num_switch_to_robot = 0  # switches back to robot
-
-    # estimate switch-back parameter and initial switch-to parameter from data
+    # ----------------------------------------------------------
+    # 9. 初始化統計量與 threshold
+    # ----------------------------------------------------------
+    # 計算 switch-back / switch-to thresholds
     switch2robot_thresh, switch2human_thresh = estimate_initial_thresholds(
         ac, replay_buffer, held_out_data, target_rate
     )
     print("Estimated switch-back threshold: {}".format(switch2robot_thresh))
     print("Estimated switch-to threshold: {}".format(switch2human_thresh))
 
-    # switch2human_thresh2, switch2robot_thresh2: 針對 risk-based (Qrisk) 的切換門檻
+    # 針對 risk-based (Qrisk) 的初始切換門檻
     switch2human_thresh2 = 0.48  # a priori guess: 48% discounted probability of success. Could also estimate from data
     switch2robot_thresh2 = 0.495
 
-    # 清空 GPU cache (避免記憶體壓力)
+    # 清空 GPU cache（避免記憶體壓力）
     torch.cuda.empty_cache()
-    # we only needed the held out set to check valid loss and compute thresholds, so we can get rid of it.
+
+    # held-out set 之後不用了，把它也補進 replay buffer（讓之後 retrain 能看到全部資料）
     replay_buffer.fill_buffer(held_out_data["obs"], held_out_data["act"])
 
     # 訓練過程中統計資訊
     total_env_interacts = 0  # 環境互動的總步數
     ep_num = 0  # 總 episode 數
-    fail_ct = 0  # 失敗 episode 數 (超過 horizon)
+    fail_ct = 0  # 失敗 episode 數（超過 horizon）
+    online_burden = 0  # supervisor 標註總數
+    num_switch_to_human = 0  # 因 novelty 切到 human 次數
+    num_switch_to_human2 = 0  # 因 risk 切到 human 次數
+    num_switch_to_robot = 0  # 從 human/recovery 切回 robot 次數
 
     #######################################
     # ====== Main ThriftyDAgger Loop ======
