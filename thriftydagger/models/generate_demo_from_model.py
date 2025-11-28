@@ -10,6 +10,19 @@ from thrifty.robomimic_expert import RobomimicExpert
 from copy import deepcopy
 from deepdiff import DeepDiff
 
+# copy from robosuite.GymWrapper
+def _flatten_obs(obs_dict, verbose=False):
+    """
+    Filters keys of interest out and concatenate the information.
+
+    Args:
+        obs_dict (OrderedDict): ordered dictionary of observations
+        verbose (bool): Whether to print out to console as observation keys are processed
+
+    Returns:
+        np.array: observations flattened into a 1d array
+    """
+    return np.concat([obs_dict['robot0_proprio-state'], obs_dict['object-state']])
 
 class ObsCachingWrapper:
     """
@@ -158,20 +171,19 @@ def get_real_depth_map(env, depth_map):
     near = env.sim.model.vis.map.znear * extent
     return near / (1.0 - depth_map * (1.0 - near / far))
 
-def raw_observation_to_thrifty_dagger_observation(obs_dict):
-    return {
-        "robot0_eef_pos": obs_dict["robot0_eef_pos"],
-        "robot0_eef_quat": obs_dict["robot0_eef_quat"],
-        "robot0_gripper_qpos": obs_dict["robot0_gripper_qpos"],
-        "object": obs_dict["object-state"],
-    }
+# def raw_observation_to_thrifty_dagger_observation(obs_dict):
+#     return {
+#         "robot0_eef_pos": obs_dict["robot0_eef_pos"],
+#         "robot0_eef_quat": obs_dict["robot0_eef_quat"],
+#         "robot0_gripper_qpos": obs_dict["robot0_gripper_qpos"],
+#         "object": obs_dict["object-state"],
+#     }
 
 
 model_name = "model_epoch_2000_low_dim_v15_success_0.5"
 ckpt = f"models/{model_name}.pth"
 robomimic_env, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
 policy, _ = policy_from_checkpoint(device="cuda" if torch.cuda.is_available() else "cpu", ckpt_dict=ckpt_dict)
-
 
 config = {
     "env_name": "NutAssemblySquare",
@@ -239,15 +251,7 @@ config = {
 #     use_object_obs=True,
 # )
 obs_cacher = ObsCachingWrapper(robomimic_env.env)
-env = GymWrapper(
-    obs_cacher,
-    keys=[
-        "robot0_eef_pos",
-        "robot0_eef_quat",
-        "robot0_gripper_qpos",
-        "object",
-    ],
-)
+env = GymWrapper(obs_cacher)
 env = VisualizationWrapper(env, indicator_configs=None)
 env = CustomWrapper(env, render=False)
 
@@ -263,7 +267,7 @@ env = CustomWrapper(env, render=False)
 # print(env.env.env.env.env)
 # print("\033[32m ref", robomimic_env, "\033[0m")
 
-N = 300
+N = 100
 obs_list, act_list = [], []
 ep = 1
 while ep <= N:
@@ -281,7 +285,7 @@ while ep <= N:
         # o_mid_old = get_observation(env=env, di=env.env.observation_spec())
         # a = policy(o_mid_old)  # important
         robomimic_act = policy(robomimic_obs)
-        ep_obs.append(deepcopy(raw_observation_to_thrifty_dagger_observation(env.env.observation_spec())))
+        ep_obs.append(deepcopy(_flatten_obs(env.env.observation_spec())))
         ep_act.append(deepcopy(robomimic_act))
         # print(robomimic_obs)
         # print(env.env.observation_spec())

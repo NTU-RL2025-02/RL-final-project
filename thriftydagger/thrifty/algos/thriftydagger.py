@@ -11,6 +11,14 @@ import os
 import sys
 import random
 
+def get_observation_for_thrifty_dagger(env):
+    obs_dict = env.env.observation_spec()
+    return {
+        "robot0_eef_pos": obs_dict["robot0_eef_pos"],
+        "robot0_eef_quat": obs_dict["robot0_eef_quat"],
+        "robot0_gripper_qpos": obs_dict["robot0_gripper_qpos"],
+        "object": obs_dict["object-state"],
+    }
 
 class ReplayBuffer:
     """
@@ -278,6 +286,7 @@ def generate_offline_data(
 
 def thrifty(
     env,
+    env_robomimic, 
     iters=5,
     actor_critic=core.Ensemble,
     ac_kwargs=dict(),
@@ -486,23 +495,24 @@ def thrifty(
         # 用目前 policy ac 在環境中跑 num_test_episodes 回合，不會做 intervention
         obs, act, done, rew = [], [], [], []
         for j in range(num_test_episodes):
-            # 每個 episode 開始前，同樣通知 expert / suboptimal policy
-            expert_policy.start_episode()
-            suboptimal_policy.start_episode()
-            o, d, ep_ret, ep_ret2, ep_len = env.reset(), False, 0, 0, 0
+            ep_ret, ep_ret2, ep_len = 0, 0, 0
+            o_robomimic, d = env_robomimic.reset(), False
+            o = get_observation_for_thrifty_dagger(env)
             while not d:
                 obs.append(o)
                 # 用 ac.act 給出 action (ensemble 的決策)
                 a = ac.act(o)
                 a = np.clip(a, -act_limit, act_limit)
                 act.append(a)
-                o, r, d, _ = env.step(a)
+                o_robomimic, r, d, _ = env_robomimic.step(a)
+                o = get_observation_for_thrifty_dagger(env)
+
                 if robosuite:
                     # robosuite 的 success / done 檢查
-                    d = (ep_len + 1 >= horizon) or env._check_success()
-                    ep_ret2 += int(env._check_success())
+                    d = (ep_len + 1 >= horizon) or env.is_success()['task']
+                    ep_ret2 += int(env.is_success()['task'])
                     done.append(d)
-                    rew.append(int(env._check_success()))
+                    rew.append(int(env.is_success()['task']))
                 ep_ret += r
                 ep_len += 1
             print("episode #{} success? {}".format(j, rew[-1]))
@@ -625,7 +635,9 @@ def thrifty(
             suboptimal_policy.start_episode()
             # expert_mode: 目前是否由 human expert 接管
             # safety_mode: 是否由 suboptimal/safety policy 接管
-            o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
+            o_robomimic, d = env_robomimic.reset(), False
+            o = get_observation_for_thrifty_dagger(env)
+            expert_mode, safety_mode, ep_len = False, False, 0
             # if robosuite:
             #     robosuite_cfg["INPUT_DEVICE"].start_control()
             # 儲存這個 episode 的軌跡
@@ -648,6 +660,8 @@ def thrifty(
                 # robot policy 的 action
                 a = ac.act(o)
                 a = np.clip(a, -act_limit, act_limit)
+                a_expert = expert_policy(o_robomimic)
+                a_suboptimal_policy = suboptimal_policy(o_robomimic)
                 if not expert_mode:
                     # 非 expert_mode 時，把 variance 累積到 estimates，用來更新 switch 門檻
                     estimates.append(ac.variance(o))
@@ -655,9 +669,6 @@ def thrifty(
                     estimates2.append(ac.safety(o, a))
                 if expert_mode:
                     # expert_mode 下，使用 human expert 提供 action
-                    a_expert = expert_policy(
-                        extra_obs_extractor(env, env.env.env.latest_obs_dict)
-                    )
                     a_expert = np.clip(a_expert, -act_limit, act_limit)
                     # 把 expert 提供的 (o, a_expert) 加進 replay_buffer，增加 BC data
                     replay_buffer.store(o, a_expert)
@@ -673,14 +684,16 @@ def thrifty(
                         print("Switch to Robot")
                         expert_mode = False
                         num_switch_to_robot += 1
-                        o2, _, d, _ = env.step(a_expert)
+                        o_robomimic, r, d, _ = env_robomimic.step(a_expert)
+                        o2 = get_observation_for_thrifty_dagger(env)
                     else:
                         # 否則持續由 expert 控制
-                        o2, _, d, _ = env.step(a_expert)
+                        o_robomimic, r, d, _ = env_robomimic.step(a_expert)
+                        o2 = get_observation_for_thrifty_dagger(env)
                     act.append(a_expert)
                     sup.append(1)  # sup=1 表示這一步是 supervised (human/suboptimal)
                     # 檢查是否成功
-                    s = env._check_success()
+                    s = env.is_success()['task']
                     # 把這筆 transition 放進 Q buffer 供 Q-learning 使用
                     qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
                 elif safety_mode:
@@ -689,10 +702,6 @@ def thrifty(
                     #     extra_obs_extractor(env, env.env.env.latest_obs_dict)
                     # )
                     # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
-                    a_suboptimal_policy = expert_policy(
-                        extra_obs_extractor(env, env.env.env.latest_obs_dict)
-                    )
-
                     a_suboptimal_policy = np.clip(
                         a_suboptimal_policy, -act_limit, act_limit
                     )
@@ -708,13 +717,15 @@ def thrifty(
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
-                        o2, _, d, _ = env.step(a_suboptimal_policy)
+                        o_robomimic, r, d, _ = env_robomimic.step(a_suboptimal_policy)
+                        o2 = get_observation_for_thrifty_dagger(env)
                     else:
                         # 持續由 safety policy 控制
-                        o2, _, d, _ = env.step(a_suboptimal_policy)
+                        o_robomimic, r, d, _ = env_robomimic.step(a_suboptimal_policy)
+                        o2 = get_observation_for_thrifty_dagger(env)
                     act.append(a_suboptimal_policy)
                     sup.append(1)
-                    s = env._check_success()
+                    s = env.is_success()['task']
                     qbuffer.store(
                         o, a_suboptimal_policy, o2, int(s), (ep_len + 1 >= horizon) or s
                     )
@@ -742,10 +753,11 @@ def thrifty(
                 else:
                     # 一般情況：由 robot policy 控制
                     risk.append(ac.safety(o, a))
-                    o2, _, d, _ = env.step(a)
+                    o_robomimic, r, d, _ = env_robomimic.step(a)
+                    o = get_observation_for_thrifty_dagger(env)
                     act.append(a)
                     sup.append(0)  # sup=0 表示由 robot policy 產生
-                    s = env._check_success()
+                    s = env.is_success()['task']
                     # 即使是 robot policy，也把 transition 存進 Q buffer
                     qbuffer.store(o, a, o2, int(s), (ep_len + 1 >= horizon) or s)
                 # robosuite 的 done 判定：episode 長度到 horizon 或成功

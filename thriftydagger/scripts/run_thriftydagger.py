@@ -27,6 +27,8 @@ from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoi
 # 這裡用你搬到比較短路徑的 expert model
 # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
 
+
+env_robomimic, ckpt_dict = env_from_checkpoint(ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth", render=False)
 expert_pol, _ = policy_from_checkpoint(
     device="cuda" if torch.cuda.is_available() else "cpu",
     ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth",
@@ -272,61 +274,68 @@ if __name__ == "__main__":
             },
         },
     }
-    wandb.init(
-        entity="aawrail-RL2025",
-        project="final_project_exp0",
-        name=args.exp_name,
-        config={
-            "seed": args.seed,
-            "device": args.device,
-            "iters": args.iters,
-            "target_rate": args.targetrate,
-            "environment": args.environment,
-            "max_expert_query": args.max_expert_query,
-            "algo": (
-                "hgdagger"
-                if args.hgdagger
-                else (
-                    "lazydagger"
-                    if args.lazydagger
-                    else "thrifty_q" if True else "thrifty"
-                )
-            ),
-            "algo_sup": args.algo_sup,
-            "gen_data": args.gen_data,
-            "controller_configs": config["controller_configs"],
-        },
-    )
+    # wandb.init(
+    #     entity="aawrail-RL2025",
+    #     project="final_project_exp0",
+    #     name=args.exp_name,
+    #     config={
+    #         "seed": args.seed,
+    #         "device": args.device,
+    #         "iters": args.iters,
+    #         "target_rate": args.targetrate,
+    #         "environment": args.environment,
+    #         "max_expert_query": args.max_expert_query,
+    #         "algo": (
+    #             "hgdagger"
+    #             if args.hgdagger
+    #             else (
+    #                 "lazydagger"
+    #                 if args.lazydagger
+    #                 else "thrifty_q" if True else "thrifty"
+    #             )
+    #         ),
+    #         "algo_sup": args.algo_sup,
+    #         "gen_data": args.gen_data,
+    #         "controller_configs": config["controller_configs"],
+    #     },
+    # )
 
     # 建立 robosuite 環境
-    env = suite.make(
-        **config,
-        has_renderer=render,
-        has_offscreen_renderer=False,
-        render_camera="agentview",
-        ignore_done=True,
-        use_camera_obs=False,  # low_dim expert，不用影像
-        reward_shaping=True,
-        control_freq=20,
-        hard_reset=True,
-        use_object_obs=True,
-    )
+    # env = suite.make(
+    #     **config,
+    #     has_renderer=render,
+    #     has_offscreen_renderer=False,
+    #     render_camera="agentview",
+    #     ignore_done=True,
+    #     use_camera_obs=False,  # low_dim expert，不用影像
+    #     reward_shaping=True,
+    #     control_freq=20,
+    #     hard_reset=True,
+    #     use_object_obs=True,
+    # )
 
-    obs_cacher = ObsCachingWrapper(env)
+    obs_cacher = ObsCachingWrapper(env_robomimic.env)
     if isinstance(expert_pol, RobomimicExpert):
         print("Binding environment wrapper to RobomimicExpert...")
         expert_pol.set_env(obs_cacher)
     env = GymWrapper(
         obs_cacher,
-        keys=[
-            "robot0_eef_pos",
-            "robot0_eef_quat",
-            "robot0_gripper_qpos",
-            "object",
-        ],
+        # keys=[
+        #     "robot0_eef_pos",
+        #     "robot0_eef_quat",
+        #     "robot0_gripper_qpos",
+        #     "object",
+        # ],
     )
     env = VisualizationWrapper(env, indicator_configs=None)
     env = CustomWrapper(env, render=render)
+    # o1 = env.env.env.step([0, 0, 0, 0, 0, 0, 0])[0]
+    # o2 = env.env.env.env.latest_obs_dict
+    # o3 = env_robomimic
+    # print("\033[32m", o2, "\033[0m")
+    # print("\033[32m", o1, "\033[0m")
+
+    # from sys import exit; exit();
 
     arm_ = "right"
     config_ = "single-arm-opposed"
@@ -436,6 +445,7 @@ if __name__ == "__main__":
         else:
             thrifty(
                 env,
+                env_robomimic, 
                 iters=args.iters,
                 logger_kwargs=logger_kwargs,
                 device_idx=args.device,
@@ -444,7 +454,7 @@ if __name__ == "__main__":
                 expert_policy=expert_pol,
                 suboptimal_policy=suboptimal_policy,
                 extra_obs_extractor=get_observation,
-                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
+                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-100-linear.pkl",
                 robosuite=True,
                 robosuite_cfg=robosuite_cfg,
                 q_learning=True,
