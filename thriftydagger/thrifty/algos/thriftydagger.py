@@ -248,6 +248,32 @@ def pretrain_policies(
     return pi_optimizers
 
 
+def estimate_initial_thresholds(ac, replay_buffer, held_out_data, target_rate):
+    """
+    從 offline BC data 估計：
+      - switch2robot_thresh: robot vs expert discrepancy 的平均
+      - switch2human_thresh: ensemble variance 在 held-out set 上的 (1 - target_rate) 分位數
+    """
+    discrepancies = []
+    for i in range(replay_buffer.size):
+        a_pred = ac.act(replay_buffer.obs_buf[i])
+        a_sup = replay_buffer.act_buf[i]
+        # 用和原本一樣的 MSE 定義 discrepancy
+        discrepancies.append(np.sum((a_pred - a_sup) ** 2))
+
+    heldout_estimates = []
+    for i in range(len(held_out_data["obs"])):
+        heldout_estimates.append(ac.variance(held_out_data["obs"][i]))
+
+    switch2robot_thresh = np.mean(discrepancies)
+
+    # 和原本一樣：取 (1 - target_rate) 分位數
+    target_idx = int((1 - target_rate) * len(heldout_estimates))
+    switch2human_thresh = sorted(heldout_estimates)[target_idx]
+
+    return switch2robot_thresh, switch2human_thresh
+
+
 def thrifty(
     env,
     iters=5,
@@ -419,33 +445,16 @@ def thrifty(
     num_switch_to_robot = 0  # switches back to robot
 
     # estimate switch-back parameter and initial switch-to parameter from data
-    # 使用 offline data 估計 switch threshold：
-    #   - switch2robot_thresh: 判斷何時從 human/safety 切回 robot
-    #   - switch2human_thresh: 判斷何時從 robot 切去 human (由 uncertainty 決定)
-    discrepancies, estimates = [], []
-    for i in range(replay_buffer.size):
-        a_pred = ac.act(replay_buffer.obs_buf[i])
-        a_sup = replay_buffer.act_buf[i]
-        # discrepancies: robot 和 expert 的 action MSE
-        discrepancies.append(sum((a_pred - a_sup) ** 2))
-        # estimates: ac.variance 對該 obs 算出的不確定性
-        estimates.append(ac.variance(replay_buffer.obs_buf[i]))
-    heldout_discrepancies, heldout_estimates = [], []
-    for i in range(len(held_out_data["obs"])):
-        a_pred = ac.act(held_out_data["obs"][i])
-        a_sup = held_out_data["act"][i]
-        heldout_discrepancies.append(sum((a_pred - a_sup) ** 2))
-        heldout_estimates.append(ac.variance(held_out_data["obs"][i]))
-    # switch2robot_thresh: 使用整個 replay_buffer 的平均 discrepancy
-    switch2robot_thresh = np.array(discrepancies).mean()
-    # switch2human_thresh: 使用 held-out set 的 uncertainty 分位數
-    target_idx = int((1 - target_rate) * len(heldout_estimates))
-    switch2human_thresh = sorted(heldout_estimates)[target_idx]
+    switch2robot_thresh, switch2human_thresh = estimate_initial_thresholds(
+        ac, replay_buffer, held_out_data, target_rate
+    )
     print("Estimated switch-back threshold: {}".format(switch2robot_thresh))
     print("Estimated switch-to threshold: {}".format(switch2human_thresh))
+
     # switch2human_thresh2, switch2robot_thresh2: 針對 risk-based (Qrisk) 的切換門檻
     switch2human_thresh2 = 0.48  # a priori guess: 48% discounted probability of success. Could also estimate from data
     switch2robot_thresh2 = 0.495
+
     # 清空 GPU cache (避免記憶體壓力)
     torch.cuda.empty_cache()
     # we only needed the held out set to check valid loss and compute thresholds, so we can get rid of it.
