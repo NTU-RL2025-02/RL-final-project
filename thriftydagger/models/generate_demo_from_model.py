@@ -38,8 +38,6 @@ class ObsCachingWrapper:
 
     def __getattr__(self, name):
         return getattr(self.env, name)
-
-
 class CustomWrapper(gym.Env):
     def __init__(self, env, render):
         self.env = env
@@ -103,8 +101,6 @@ class CustomWrapper(gym.Env):
 
 
 lang_emb = np.load("models/lang_emb.npy")
-
-
 def get_observation(env, di):
     """
     Get current environment observation dictionary.
@@ -149,8 +145,6 @@ def get_observation(env, di):
 
     ret[LangUtils.LANG_EMB_OBS_KEY] = np.array(lang_emb)
     return ret
-
-
 def get_real_depth_map(env, depth_map):
     """
     Reproduced from https://github.com/ARISE-Initiative/robosuite/blob/c57e282553a4f42378f2635b9a3cbc4afba270fd/robosuite/utils/camera_utils.py#L106
@@ -164,52 +158,87 @@ def get_real_depth_map(env, depth_map):
     near = env.sim.model.vis.map.znear * extent
     return near / (1.0 - depth_map * (1.0 - near / far))
 
-robosuite_env_name = "NutAssemblySquare"
-robots = "Panda"
+def raw_observation_to_thrifty_dagger_observation(obs_dict):
+    return {
+        "robot0_eef_pos": obs_dict["robot0_eef_pos"],
+        "robot0_eef_quat": obs_dict["robot0_eef_quat"],
+        "robot0_gripper_qpos": obs_dict["robot0_gripper_qpos"],
+        "object": obs_dict["object-state"],
+    }
+
+
+model_name = "model_epoch_2000_low_dim_v15_success_0.5"
+ckpt = f"models/{model_name}.pth"
+robomimic_env, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
+policy, _ = policy_from_checkpoint(device="cuda" if torch.cuda.is_available() else "cpu", ckpt_dict=ckpt_dict)
+
+
 config = {
-    "env_name": robosuite_env_name,
-    "robots": robots,
+    "env_name": "NutAssemblySquare",
+    "robots": "Panda",
+    "camera_depths": False,
+    "camera_heights": 84,
+    "camera_widths": 84,
     "controller_configs": {
-        "type": "BASIC",
         "body_parts": {
             "right": {
-                "type": "OSC_POSE",
+                "control_delta": True,
+                "damping": 1,
+                "damping_limits": [
+                    0,
+                    10
+                ],
+                "gripper": {
+                    "type": "GRIP"
+                },
+                "impedance_mode": "fixed",
                 "input_max": 1,
                 "input_min": -1,
-                "output_max": [0.05, 0.05, 0.05, 0.5, 0.5, 0.5],
-                "output_min": [-0.05, -0.05, -0.05, -0.5, -0.5, -0.5],
+                "interpolation": None, 
+                "input_ref_frame": "world",
                 "kp": 150,
-                "damping_ratio": 1,
-                "impedance_mode": "fixed",
-                "kp_limits": [0, 300],
-                "damping_ratio_limits": [0, 10],
-                "position_limits": None,
-                "orientation_limits": None,
-                "uncouple_pos_ori": True,
-                "input_type": "delta",
-                "input_ref_frame": "base",
-                "interpolation": None,
+                "kp_limits": [
+                    0,
+                    300
+                ],
+                "output_max": [
+                    0.05,
+                    0.05,
+                    0.05,
+                    0.5,
+                    0.5,
+                    0.5
+                ],
+                "output_min": [
+                    -0.05,
+                    -0.05,
+                    -0.05,
+                    -0.5,
+                    -0.5,
+                    -0.5
+                ],
                 "ramp_ratio": 0.2,
-                "gripper": {"type": "GRIP"},
+                "type": "OSC_POSE",    
             }
         },
+        "type": "BASIC"
     },
 }
-
 # 建立 robosuite 環境
-env = suite.make(
-    **config,
-    has_renderer=False,
-    has_offscreen_renderer=False,
-    render_camera="agentview",
-    ignore_done=True,
-    use_camera_obs=False,  # low_dim expert，不用影像
-    reward_shaping=True,
-    control_freq=20,
-    hard_reset=True,
-    use_object_obs=True,
-)
-obs_cacher = ObsCachingWrapper(env)
+# env = suite.make(
+#     **config,
+#     has_renderer=False,
+#     has_offscreen_renderer=False,
+#     render_camera="agentview",
+#     ignore_done=True,
+#     use_camera_obs=False,  # low_dim expert，不用影像
+#     reward_shaping=False,
+#     control_freq=20,
+#     lite_physics=False,
+#     hard_reset=True,
+#     use_object_obs=True,
+# )
+obs_cacher = ObsCachingWrapper(robomimic_env.env)
 env = GymWrapper(
     obs_cacher,
     keys=[
@@ -222,8 +251,6 @@ env = GymWrapper(
 env = VisualizationWrapper(env, indicator_configs=None)
 env = CustomWrapper(env, render=False)
 
-raw_env = obs_cacher 
-
 
 # model_name = "model_epoch_2000_low_dim_v15_success_0.5"
 # expert_pol = RobomimicExpert(
@@ -232,60 +259,59 @@ raw_env = obs_cacher
 # )
 # expert_pol.set_env(obs_cacher)
 
-model_name = "model_epoch_2000_low_dim_v15_success_0.5"
-ckpt = f"models/{model_name}.pth"
-env_ref, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
-policy, _ = policy_from_checkpoint(device="cpu", ckpt_dict=ckpt_dict)
 
+# print(env.env.env.env.env)
+# print("\033[32m ref", robomimic_env, "\033[0m")
+
+N = 300
 obs_list, act_list = [], []
 ep = 1
-while ep <= 10:
+while ep <= N:
     ep_obs, ep_act = [], []
     policy.start_episode()  # important
-    o, done = env.reset(), False
-    o_ref, done_ref = env_ref.reset(), False
+    # o, done = env.reset(), False
+    robomimic_obs, robomimic_done = robomimic_env.reset(), False
     # print(f"raw robosuite: {obs_cacher.latest_obs_dict}")
     # print(f"observation from thrifty dagger: {o}")
-    # print(f"observation from reference: {o_ref}")
+    # print(f"observation from reference: {robomimic_obs}")
     # import sys
     # sys.exits()
     step = 0
-    while not done and len(ep_obs) < 300:
-        o_mid_old = get_observation(env=env, di=env.env.observation_spec())
-        a = policy(o_mid_old)  # important
-        a_ref = policy(o_ref)
+    while not robomimic_done and len(ep_act) < 300:
+        # o_mid_old = get_observation(env=env, di=env.env.observation_spec())
+        # a = policy(o_mid_old)  # important
+        robomimic_act = policy(robomimic_obs)
+        ep_obs.append(deepcopy(raw_observation_to_thrifty_dagger_observation(env.env.observation_spec())))
+        ep_act.append(deepcopy(robomimic_act))
+        # print(robomimic_obs)
+        # print(env.env.observation_spec())
+        # print("\033[32m OBS:", ep_obs[-1], "\033[0m")
 
-        # curr_raw_obs = obs_cacher.latest_obs_dict
-        # obs_for_policy = get_observation(raw_env, curr_raw_obs)
-        # a = policy(obs_for_policy)
-        # ep_obs.append(deepcopy(o))
-        # ep_act.append(deepcopy(a))
+        # o, _r, _sys_done, _info = env.step(a)
+        # done = env._check_success()
 
-        o, _r, _sys_done, _info = env.step(a)
-        done = env._check_success()
-
-        o_ref, _r, _sys_done, _info = env_ref.step(a_ref)
-        done_ref = env_ref.is_success()['task']
+        robomimic_obs, _r, _sys_done, _info = robomimic_env.step(robomimic_act)
+        robomimic_done = robomimic_env.is_success()['task']
     
     
-        # ep_obs.append(o_ref)
-        # ep_act.append(a_ref)
+        # ep_obs.append(robomimic_obs)
+        # ep_act.append(robomimic_act)
 
     
         step += 1
-        print(step)
-        print("\033[32m OBS:" , DeepDiff(get_observation(env, env.env.observation_spec()), o_ref), "\033[0m")
-        print(DeepDiff(a, a_ref))
-        print(done == done_ref)
-    print(f"{ep}: done={done}, episode length={len(ep_obs)}")
-    if done:
+        # print(step)
+        # print("\033[32m OBS:" , DeepDiff(get_observation(env, env.env.observation_spec()), robomimic_obs), "\033[0m")
+        # print(DeepDiff(a, robomimic_act))
+        # print(done == robomimic_done)
+    print(f"{ep}: done={robomimic_done}, episode length={len(ep_act)}")
+    if robomimic_done:
         ep += 1
         obs_list.extend(ep_obs)
         act_list.extend(ep_act)
         
 pickle.dump(
     {"obs": np.array(obs_list), "act": np.array(act_list)},
-    open(f"models/{model_name}-30.pkl", "wb"),
+    open(f"models/{model_name}-{N}.pkl", "wb"),
 )
 
 # ep = 1
