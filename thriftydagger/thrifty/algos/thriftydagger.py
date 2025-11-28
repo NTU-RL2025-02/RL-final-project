@@ -497,63 +497,78 @@ def thrifty(
     num_switch_to_human2 = 0  # 因 risk 切到 human 次數
     num_switch_to_robot = 0  # 從 human/recovery 切回 robot 次數
 
-    #######################################
-    # ====== Main ThriftyDAgger Loop ======
-    #######################################
+    # ----------------------------------------------------------
+    # 10. Main ThriftyDAgger Loop
+    # ----------------------------------------------------------
     for t in range(iters + 1):
-        # logging_data: 存這次 iter 的完整 rollouts 資料 (方便之後分析)
-        logging_data = []  # for verbose logging
-        estimates = []
-        estimates2 = []  # refit every iter
+        # --------------------------------------------------
+        # 1. 初始化本 iter 的暫存變數
+        # --------------------------------------------------
+        logging_data = []  # 存這次 iter 的完整 rollouts（方便離線分析）
+        estimates = []  # 線上觀測到的 variance（用來更新 switch2human_thresh）
+        estimates2 = []  # 線上觀測到的 safety score（用來更新 risk-based 門檻）
         i = 0
-        # t=0 時不做 data collection (只用 offline BC），留給 Q-training 使用
-        if t == 0:  # skip data collection on iter 0 to train Q
+
+        # t = 0：只做 Q-training，不做資料收集
+        if t == 0:
             i = obs_per_iter
-        # 每個 iter 收集 obs_per_iter 步的資料
+
+        # --------------------------------------------------
+        # 2. 收集 obs_per_iter 步的資料
+        # --------------------------------------------------
         while i < obs_per_iter:
-            # 每個 episode 開始前通知 expert / suboptimal policy
+            # 每個 episode 開始前通知 expert / recovery policy
             expert_policy.start_episode()
             recovery_policy.start_episode()
-            o, d, expert_mode, safety_mode, ep_len = env.reset(), False, False, False, 0
-            # if robosuite:
-            #     robosuite_cfg["INPUT_DEVICE"].start_control()
-            # 儲存這個 episode 的軌跡
+
+            o, d = env.reset(), False
+            expert_mode = False  # True：目前由 human expert 控制
+            safety_mode = False  # True：目前由 recovery/safety policy 控制
+            ep_len = 0
+
+            # episode 累積的軌跡
             obs, act, rew, done, sup, var, risk = (
-                [o],
-                [],
-                [],
-                [],
-                [],
-                [ac.variance(o)],
-                [],
+                [o],  # 初始 obs
+                [],  # actions
+                [],  # rewards（成功:1 / 失敗:0）
+                [],  # done flags
+                [],  # sup 標記（1: supervised, 0: robot）
+                [ac.variance(o)],  # 初始 state 的 variance
+                [],  # safety scores
             )
-            # robosuite 的話還會記錄 simstates 方便 replay
+
+            # robosuite 額外記錄 sim states 方便 replay
             if robosuite:
-                simstates = [
-                    env.env.sim.get_state().flatten()
-                ]  # track this to replay trajectories after if desired.
-            # 在這個 episode 中持續互動，直到 done 或收集步數達到 obs_per_iter
+                simstates = [env.env.sim.get_state().flatten()]
+
+            # 單一 episode 中與環境互動，直到 done 或收集步數達到 obs_per_iter
             while i < obs_per_iter and not d:
-                # robot policy 的 action
+                # robot policy 的 action（ensemble aggregation）
                 a = ac.act(o)
                 a = np.clip(a, -act_limit, act_limit)
+
                 if not expert_mode:
-                    # 非 expert_mode 時，把 variance 累積到 estimates，用來更新 switch 門檻
+                    # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
                     estimates.append(ac.variance(o))
-                    # estimates2: safety score，用於 risk-based switching
                     estimates2.append(ac.safety(o, a))
+
+                # --------------------------------------------------
+                # 2-1. expert_mode：由 human expert 控制
+                # --------------------------------------------------
                 if expert_mode:
-                    # expert_mode 下，使用 human expert 提供 action
                     a_expert = expert_policy(
                         extra_obs_extractor(env, env.env.env.latest_obs_dict)
                     )
                     a_expert = np.clip(a_expert, -act_limit, act_limit)
-                    # 把 expert 提供的 (o, a_expert) 加進 replay_buffer，增加 BC data
+
+                    # 收集 expert demo 到 replay buffer（online BC）
                     replay_buffer.store(o, a_expert)
                     online_burden += 1
-                    # risk: safety critic 對 expert action 的安全評估
+
+                    # safety critic 對 expert action 的評分
                     risk.append(ac.safety(o, a_expert))
 
+                    # 判斷是否可以切回 robot policy
                     if sum((a - a_expert) ** 2) < switch2robot_thresh and (
                         not q_learning or ac.safety(o, a) > switch2robot_thresh2
                     ):
@@ -564,30 +579,31 @@ def thrifty(
                     else:
                         # 否則持續由 expert 控制
                         o2, _, d, _ = env.step(a_expert)
-                    act.append(a_expert)
-                    sup.append(1)  # sup=1 表示這一步是 supervised (human/suboptimal)
-                    # 檢查是否成功
-                    s = env._check_success()
-                    # 把這筆 transition 放進 Q buffer 供 Q-learning 使用
-                    qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
-                elif safety_mode:
-                    # safety_mode 下改由 suboptimal/safety policy 控制
-                    # a_suboptimal_policy = suboptimal_policy(
-                    #     extra_obs_extractor(env, env.env.env.latest_obs_dict)
-                    # )
-                    # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
 
+                    act.append(a_expert)
+                    sup.append(1)  # 1 = supervised (human / recovery)
+
+                    s = env._check_success()
+                    # 將 expert transition 也丟給 Q buffer（用於 Q-risk）
+                    qbuffer.store(o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s)
+
+                # --------------------------------------------------
+                # 2-2. safety_mode：由 recovery / safety policy 控制
+                # --------------------------------------------------
+                elif safety_mode:
+                    # NOTE: 目前用 recovery_policy 代替 suboptimal_policy
                     a_recovery_policy = recovery_policy(
                         extra_obs_extractor(env, env.env.env.latest_obs_dict)
                     )
                     a_recovery_policy = np.clip(
                         a_recovery_policy, -act_limit, act_limit
                     )
-                    # 一樣將 safety policy 的資料存進 replay buffer
+
+                    # 同樣把 safety policy 的 action 加進 replay buffer
                     replay_buffer.store(o, a_recovery_policy)
                     risk.append(ac.safety(o, a_recovery_policy))
 
-                    # 檢查是否要切回 robot policy
+                    # 判斷是否可以切回 robot policy
                     if sum((a - a_recovery_policy) ** 2) < switch2robot_thresh and (
                         not q_learning or ac.safety(o, a) > switch2robot_thresh2
                     ):
@@ -600,6 +616,7 @@ def thrifty(
 
                     act.append(a_recovery_policy)
                     sup.append(1)
+
                     s = env._check_success()
                     qbuffer.store(
                         o,
@@ -609,49 +626,72 @@ def thrifty(
                         (ep_len + 1 >= horizon) or s,
                     )
 
+                # --------------------------------------------------
+                # 2-3. 檢查是否需要「切到 human」：novelty / risk
+                # --------------------------------------------------
                 elif ac.variance(o) > switch2human_thresh:
+                    # novel state：ensemble 對此 state 的不確定度太高
                     print("Switch to Human (Novel)")
                     num_switch_to_human += 1
                     expert_mode = True
+                    # 不前進環境，下一輪 loop 由 expert_policy 來決定 action
                     continue
 
                 elif q_learning and ac.safety(o, a) < switch2human_thresh2:
+                    # risk 太高：safety critic 覺得 robot action 不安全
                     print("Switch to Human (Risk)")
                     num_switch_to_human2 += 1
                     safety_mode = True
+                    # 同樣不前進環境
                     continue
+
+                # --------------------------------------------------
+                # 2-4. 一般情況：由 robot policy 控制
+                # --------------------------------------------------
                 else:
-                    # 一般情況：由 robot policy 控制
                     risk.append(ac.safety(o, a))
                     o2, _, d, _ = env.step(a)
+
                     act.append(a)
-                    sup.append(0)  # sup=0 表示由 robot policy 產生
+                    sup.append(0)  # 0 = robot 自己產生的動作
+
                     s = env._check_success()
-                    # 即使是 robot policy，也把 transition 存進 Q buffer
+                    # robot 的 transition 也餵進 Q buffer（on-policy data）
                     qbuffer.store(o, a, o2, int(s), (ep_len + 1 >= horizon) or s)
-                # robosuite 的 done 判定：episode 長度到 horizon 或成功
+
+                # --------------------------------------------------
+                # 2-5. 更新 episode / logging 狀態
+                # --------------------------------------------------
+                # robosuite 的終止條件：成功或 max horizon
                 d = (ep_len + 1 >= horizon) or env._check_success()
                 done.append(d)
-                # rew: 這裡 reward 簡化為是否成功 (0/1)
+
+                # reward：這裡簡化為 success flag（0/1）
                 rew.append(int(env._check_success()))
-                # 前進到下一步狀態
+
+                # 前進到下一個 state
                 o = o2
                 obs.append(o)
+
                 if robosuite:
                     # 紀錄 simstate 以便之後可以重播整個 episode
                     simstates.append(env.env.sim.get_state().flatten())
-                # var: 對新 state 的 variance
+
+                # 更新 variance 記錄
                 var.append(ac.variance(o))
+
                 i += 1
                 ep_len += 1
+
+            # -------- episode 結束後的統計與 logging_data 更新 --------
             if d:
-                # episode 結束
                 ep_num += 1
             if ep_len >= horizon:
-                # 若是因為 horizon 而終止，視為失敗
+                # 若是因為 horizon 而終止，視為 failure
                 fail_ct += 1
+
             total_env_interacts += ep_len
-            # 把整個 episode 的 log 存到 logging_data
+
             logging_data.append(
                 {
                     "obs": np.stack(obs),
@@ -668,22 +708,29 @@ def thrifty(
                     "simstates": np.array(simstates) if robosuite else None,
                 }
             )
-            # 將這個 iter 的 rollouts 存成 iter{t}.pkl
+
+            # 每個 iter 持續覆寫 iter{t}.pkl，內容包含到目前為止所有 episodes
             pickle.dump(
                 logging_data,
                 open(logger_kwargs["output_dir"] + "/iter{}.pkl".format(t), "wb"),
             )
+
             if robosuite:
                 env.close()
-            # recompute thresholds from data after every episode
-            # 收集到一定數量的 estimates 後，重算 switching threshold
+
+            # 當 estimates 累積到一定數量後，即時更新 switching thresholds
             if len(estimates) > 25:
                 target_idx = int((1 - target_rate) * len(estimates))
+
+                # variance 門檻：分位數
                 switch2human_thresh = sorted(estimates)[target_idx]
-                # estimates2 是 safety 的分數，越大越安全 (假設)
+
+                # safety 分數：越大越安全，故分位數要從大排到小
                 switch2human_thresh2 = sorted(estimates2, reverse=True)[target_idx]
-                # switch2robot_thresh2 大約取中位數，用來判斷是否切回 robot
+
+                # robot 門檻取中位數（heuristic）
                 switch2robot_thresh2 = sorted(estimates2)[int(0.5 * len(estimates))]
+
                 print(
                     "len(estimates): {}, New switch thresholds: {} {} {}".format(
                         len(estimates),
@@ -693,11 +740,13 @@ def thrifty(
                     )
                 )
 
+        # --------------------------------------------------
+        # 3. retrain policy from scratch（DAgger-aggregate BC）
+        # --------------------------------------------------
         if t > 0:
-            # retrain policy from scratch
-            # 每個 iter 結束後，使用目前累積的 replay_buffer 資料
-            # 從頭重新訓練整個 actor_critic (ensemble)
             loss_pi = []
+
+            # 重新初始化一個 actor_critic，並用目前累積的 replay_buffer 訓練
             ac = actor_critic(
                 env.observation_space,
                 env.action_space,
@@ -705,12 +754,15 @@ def thrifty(
                 num_nets=num_nets,
                 **ac_kwargs,
             )
+
+            # 更新 ensemble 每個成員的 optimizer
             pi_optimizers = [
                 Adam(ac.pis[i].parameters(), lr=pi_lr) for i in range(ac.num_nets)
             ]
+
             for i in range(ac.num_nets):
-                if ac.num_nets > 1:  # create new datasets via sampling with replacement
-                    # bootstrap resampling，讓每個 ensemble 成員看到不同資料子集
+                # bootstrap resampling：為每個 ensemble net 建立自己的 dataset
+                if ac.num_nets > 1:
                     tmp_buffer = ReplayBuffer(
                         obs_dim=obs_dim,
                         act_dim=act_dim,
@@ -720,19 +772,23 @@ def thrifty(
                     for _ in range(replay_buffer.size):
                         idx = np.random.randint(replay_buffer.size)
                         tmp_buffer.store(
-                            replay_buffer.obs_buf[idx], replay_buffer.act_buf[idx]
+                            replay_buffer.obs_buf[idx],
+                            replay_buffer.act_buf[idx],
                         )
                 else:
                     tmp_buffer = replay_buffer
-                # 訓練次數會隨著 iter 增加 (bc_epochs + t)
+
+                # iter 越晚，訓練次數越多：grad_steps * (bc_epochs + t)
                 for _ in range(grad_steps * (bc_epochs + t)):
                     batch = tmp_buffer.sample_batch(batch_size)
                     loss_pi.append(update_pi(ac, pi_optimizers[i], batch, i))
-        # retrain Qrisk
+
+        # --------------------------------------------------
+        # 4. retrain Q_risk（safety critic，選擇性）
+        # --------------------------------------------------
         if q_learning:
-            # 若要訓練 Q-risk safety critic
             if num_test_episodes > 0:
-                # 先跑 test_agent，使用目前的 policy 收集一批 rollouts 當作 Q-training 資料
+                # 用目前 policy ac 跑幾個 episode，離線收集 Q-training data
                 test_agent(
                     expert_policy,
                     recovery_policy,
@@ -748,31 +804,37 @@ def thrifty(
                 data = pickle.load(open("test-rollouts.pkl", "rb"))
                 qbuffer.fill_buffer(data)
                 os.remove("test-rollouts.pkl")
+
             # 重新設定 Q-network optimizer
             q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
             q_optimizer = Adam(q_params, lr=pi_lr)
+
             loss_q = []
             # 做 bc_epochs 個 epoch，每個 epoch 進行 grad_steps * 5 次 update
             for _ in range(bc_epochs):
                 for i in range(grad_steps * 5):
-                    # 每個 batch 固定一定比例的 positive samples (pos_fraction=0.1)
                     batch = qbuffer.sample_batch(batch_size // 2, pos_fraction=0.1)
                     loss_q.append(
                         update_q(ac, ac_targ, q_optimizer, batch, gamma, timer=i)
                     )
 
-        # end of epoch logging
-        # 儲存當前模型權重
-        logger.save_state(dict())
+        # --------------------------------------------------
+        # 5. end-of-epoch logging（印出統計、寫 progress.txt）
+        # --------------------------------------------------
+        logger.save_state(dict())  # 儲存目前模型權重
+
         print("Epoch", t)
         avg_loss_pi = 0.0
         avg_loss_q = 0.0
+
         if t > 0:
             avg_loss_pi = sum(loss_pi) / len(loss_pi)
-            print("LossPi", sum(loss_pi) / len(loss_pi))
+            print("LossPi", avg_loss_pi)
+
         if q_learning:
             avg_loss_q = sum(loss_q) / len(loss_q)
-            print("LossQ", sum(loss_q) / len(loss_q))
+            print("LossQ", avg_loss_q)
+
         print("TotalEpisodes", ep_num)
         print("TotalSuccesses", ep_num - fail_ct)
         print("TotalEnvInteracts", total_env_interacts)
@@ -781,10 +843,9 @@ def thrifty(
         print("NumSwitchToRisk", num_switch_to_human2)
         print("NumSwitchBack", num_switch_to_robot)
 
-        # ===== Write to progress.txt using EpochLogger =====
-        # success_rate: 成功 episode 所佔比例
+        # success_rate: 成功 episode 的比例
         success_rate = (ep_num - fail_ct) / ep_num if ep_num > 0 else 0.0
-        # 使用 logger.log_tabular 寫出 scalar 統計到 progress.txt
+
         logger.log_tabular("Epoch", t)
         logger.log_tabular("LossPi", avg_loss_pi)
         if q_learning:
@@ -799,9 +860,10 @@ def thrifty(
         logger.log_tabular("NumSwitchBack", num_switch_to_robot)
 
         logger.dump_tabular()
-        # ============================================
 
-        # 若已經超過最大允許 expert 查詢次數，提前停止訓練
+        # --------------------------------------------------
+        # 6. 早停條件：supervisor label 達上限
+        # --------------------------------------------------
         if online_burden >= max_expert_query:
             print("Reached max expert queries, stopping training.")
             break
