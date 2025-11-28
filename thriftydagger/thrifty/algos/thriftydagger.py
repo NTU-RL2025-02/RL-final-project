@@ -88,6 +88,59 @@ def generate_offline_data(
     pickle.dump({"obs": np.stack(obs), "act": np.stack(act)}, open(output_file, "wb"))
 
 
+def compute_loss_pi(ac, data, i):
+    o, a = data["obs"], data["act"]
+    a_pred = ac.pis[i](o)
+    return torch.mean(torch.sum((a - a_pred) ** 2, dim=1))
+
+
+def compute_loss_q(ac, ac_targ, data, gamma):
+    o, a, o2, r, d = (
+        data["obs"],
+        data["act"],
+        data["obs2"],
+        data["rew"],
+        data["done"],
+    )
+    with torch.no_grad():
+        a2 = torch.mean(torch.stack([pi(o2) for pi in ac.pis]), dim=0)
+
+    q1 = ac.q1(o, a)
+    q2 = ac.q2(o, a)
+
+    with torch.no_grad():
+        q1_t = ac_targ.q1(o2, a2)
+        q2_t = ac_targ.q2(o2, a2)
+        backup = r + gamma * (1 - d) * torch.min(q1_t, q2_t)
+
+    loss_q1 = ((q1 - backup) ** 2).mean()
+    loss_q2 = ((q2 - backup) ** 2).mean()
+    return loss_q1 + loss_q2
+
+
+def update_pi(ac, pi_optimizer, data, i):
+    pi_optimizer.zero_grad()
+    loss_pi = compute_loss_pi(ac, data, i)
+    loss_pi.backward()
+    pi_optimizer.step()
+    return loss_pi.item()
+
+
+def update_q(ac, ac_targ, q_optimizer, data, gamma, timer):
+    q_optimizer.zero_grad()
+    loss_q = compute_loss_q(ac, ac_targ, data, gamma)
+    loss_q.backward()
+    q_optimizer.step()
+
+    if timer % 2 == 0:
+        with torch.no_grad():
+            for p, p_targ in zip(ac.parameters(), ac_targ.parameters()):
+                p_targ.data.mul_(0.995)
+                p_targ.data.add_((1 - 0.995) * p.data)
+
+    return loss_q.item()
+
+
 def thrifty(
     env,
     iters=5,
@@ -220,66 +273,6 @@ def thrifty(
     # 從 BC 的離線資料初始化 Q buffer
     qbuffer.fill_buffer_from_BC(input_data)
 
-    # Set up function for computing actor loss
-    def compute_loss_pi(data, i):
-        # data: batch 中包含 obs, act
-        # i: 第幾個 ensemble 成員
-        o, a = data["obs"], data["act"]
-        # 使用第 i 個 policy 預測 action
-        a_pred = ac.pis[i](o)
-        # 使用 MSE loss (行為克隆)
-        return torch.mean(torch.sum((a - a_pred) ** 2, dim=1))
-
-    def compute_loss_q(data):
-        # Q-loss: 使用 Bellman backup 進行 TD 誤差的 MSE
-        o, a, o2, r, d = (
-            data["obs"],
-            data["act"],
-            data["obs2"],
-            data["rew"],
-            data["done"],
-        )
-        # a2: 使用 ensemble 的平均 policy 對 next_obs 產生下一步 action
-        with torch.no_grad():
-            a2 = torch.mean(torch.stack([pi(o2) for pi in ac.pis]), dim=0)
-        # 目前 Q1, Q2 的預測值
-        q1 = ac.q1(o, a)
-        q2 = ac.q2(o, a)
-        # Bellman backup for Q functions
-        with torch.no_grad():
-            # Target network 上的 Q-values
-            q1_t = ac_targ.q1(o2, a2)  # do target policy smoothing?
-            q2_t = ac_targ.q2(o2, a2)
-            # 取 min(Q1_t, Q2_t) 當作 target Q 值 (TD3 style)
-            backup = r + gamma * (1 - d) * torch.min(q1_t, q2_t)
-        # MSE loss against Bellman backup
-        loss_q1 = ((q1 - backup) ** 2).mean()
-        loss_q2 = ((q2 - backup) ** 2).mean()
-        return loss_q1 + loss_q2
-
-    def update_pi(data, i):
-        # 對第 i 個 policy 做一次 gradient step
-        pi_optimizers[i].zero_grad()
-        loss_pi = compute_loss_pi(data, i)
-        loss_pi.backward()
-        pi_optimizers[i].step()
-        return loss_pi.item()
-
-    def update_q(data, timer):
-        # 對 Q-network 做一次 gradient step
-        q_optimizer.zero_grad()
-        loss_q = compute_loss_q(data)
-        loss_q.backward()
-        q_optimizer.step()
-        # 每隔幾步更新一次 target network
-        if timer % 2 == 0:
-            with torch.no_grad():
-                for p, p_targ in zip(ac.parameters(), ac_targ.parameters()):
-                    # 以 polyak averaging 更新 target 參數
-                    p_targ.data.mul_(0.995)
-                    p_targ.data.add_((1 - 0.995) * p.data)
-        return loss_q.item()
-
     # Prepare for interaction with environment
     # online_burden: 對 human expert 請求 label 的總次數
     online_burden = 0  # how many labels we get from supervisor
@@ -367,7 +360,7 @@ def thrifty(
             loss_pi = []
             for _ in range(grad_steps):
                 batch = tmp_buffer.sample_batch(batch_size)
-                loss_pi.append(update_pi(batch, i))
+                loss_pi.append(update_pi(ac, pi_optimizers[i], batch, i))
             # 驗證集上的 validation loss，用 held_out_data 計算
             validation = []
             for j in range(len(held_out_data["obs"])):
@@ -645,7 +638,7 @@ def thrifty(
                 # 訓練次數會隨著 iter 增加 (bc_epochs + t)
                 for _ in range(grad_steps * (bc_epochs + t)):
                     batch = tmp_buffer.sample_batch(batch_size)
-                    loss_pi.append(update_pi(batch, i))
+                    loss_pi.append(update_pi(ac, pi_optimizers[i], batch, i))
         # retrain Qrisk
         if q_learning:
             # 若要訓練 Q-risk safety critic
@@ -664,7 +657,9 @@ def thrifty(
                 for i in range(grad_steps * 5):
                     # 每個 batch 固定一定比例的 positive samples (pos_fraction=0.1)
                     batch = qbuffer.sample_batch(batch_size // 2, pos_fraction=0.1)
-                    loss_q.append(update_q(batch, timer=i))
+                    loss_q.append(
+                        update_q(ac, ac_targ, q_optimizer, batch, gamma, timer=i)
+                    )
 
         # end of epoch logging
         # 儲存當前模型權重
