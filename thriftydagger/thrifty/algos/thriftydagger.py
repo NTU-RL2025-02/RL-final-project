@@ -575,7 +575,9 @@ def thrifty(
                         print("Switch to Robot")
                         expert_mode = False
                         num_switch_to_robot += 1
-                        o2, _, d, _ = env.step(a_expert)
+                        o2, _, d, _ = env.step(
+                            a_expert
+                        )  # FIXME: Should this be a? @Sheng-Yu-Cheng
                     else:
                         # 否則持續由 expert 控制
                         o2, _, d, _ = env.step(a_expert)
@@ -610,7 +612,9 @@ def thrifty(
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
-                        o2, _, d, _ = env.step(a_recovery_policy)
+                        o2, _, d, _ = env.step(
+                            a_recovery_policy
+                        )  # FIXME: Should this be a? @Sheng-Yu-Cheng
                     else:
                         o2, _, d, _ = env.step(a_recovery_policy)
 
