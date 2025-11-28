@@ -141,22 +141,6 @@ def update_q(ac, ac_targ, q_optimizer, data, gamma, timer):
     return loss_q.item()
 
 
-def pretrain_policies(
-    ac,
-    replay_buffer,
-    held_out_data,
-    grad_steps,
-    bc_epochs,
-    batch_size,
-    replay_size,
-    obs_dim,
-    act_dim,
-    device,
-    pi_lr,
-):
-    pass
-
-
 def test_agent(
     expert_policy,
     recovery_policy,
@@ -708,7 +692,18 @@ def thrifty(
             # 若要訓練 Q-risk safety critic
             if num_test_episodes > 0:
                 # 先跑 test_agent，使用目前的 policy 收集一批 rollouts 當作 Q-training 資料
-                test_agent(t)  # collect samples offline from pi_R
+                test_agent(
+                    expert_policy,
+                    recovery_policy,
+                    env,
+                    ac,
+                    num_test_episodes,
+                    act_limit,
+                    horizon,
+                    robosuite,
+                    logger_kwargs,
+                    epoch=t,
+                )
                 data = pickle.load(open("test-rollouts.pkl", "rb"))
                 qbuffer.fill_buffer(data)
                 os.remove("test-rollouts.pkl")
