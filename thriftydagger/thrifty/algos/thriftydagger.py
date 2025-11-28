@@ -697,32 +697,32 @@ def thrifty(
                     #     extra_obs_extractor(env, env.env.env.latest_obs_dict)
                     # )
                     # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
-                    a_suboptimal_policy = np.clip(
-                        a_suboptimal_policy, -act_limit, act_limit
+                    a_expert = np.clip(
+                        a_expert, -act_limit, act_limit
                     )
                     # 一樣將 safety policy 的資料存進 replay buffer
-                    replay_buffer.store(o, a_suboptimal_policy)
-                    risk.append(ac.safety(o, a_suboptimal_policy))
+                    replay_buffer.store(o, a_expert)
+                    risk.append(ac.safety(o, a_expert))
                     # 檢查是否要切回 robot policy
-                    if (hg_dagger and a_suboptimal_policy[3] != 0) or (
+                    if (hg_dagger and a_expert[3] != 0) or (
                         not hg_dagger
-                        and sum((a - a_suboptimal_policy) ** 2) < switch2robot_thresh
+                        and sum((a - a_expert) ** 2) < switch2robot_thresh
                         and (not q_learning or ac.safety(o, a) > switch2robot_thresh2)
                     ):
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
-                        o_robomimic, r, d, _ = env_robomimic.step(a_suboptimal_policy)
+                        o_robomimic, r, d, _ = env_robomimic.step(a_expert)
                         o2 = get_observation_for_thrifty_dagger(env)
                     else:
                         # 持續由 safety policy 控制
-                        o_robomimic, r, d, _ = env_robomimic.step(a_suboptimal_policy)
+                        o_robomimic, r, d, _ = env_robomimic.step(a_expert)
                         o2 = get_observation_for_thrifty_dagger(env)
-                    act.append(a_suboptimal_policy)
+                    act.append(a_expert)
                     sup.append(1)
                     s = env._check_success()
                     qbuffer.store(
-                        o, a_suboptimal_policy, o2, int(s), (ep_len + 1 >= horizon) or s
+                        o, a_expert, o2, int(s), (ep_len + 1 >= horizon) or s
                     )
                 # hg-dagger switching for hg-dagger, or novelty switching for thriftydagger
                 elif (hg_dagger and hg_dagger()) or (
