@@ -24,7 +24,6 @@ from robosuite.wrappers import GymWrapper
 
 # robomimic
 import robomimic.utils.obs_utils as ObsUtils
-import robomimic.utils.lang_utils as LangUtils
 from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoint
 
 # thriftydagger
@@ -34,8 +33,6 @@ from thrifty.utils.run_utils import setup_logger_kwargs
 from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
 from thrifty.robomimic_expert import RobomimicExpert
 from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
-
-lang_emb = np.load("models/lang_emb.npy")
 
 
 def get_real_depth_map(env, depth_map):
@@ -94,6 +91,9 @@ def get_observation(env, di):
             ):
                 ret[k] = np.array(di[k])
 
+    import robomimic.utils.lang_utils as LangUtils
+
+    lang_emb = np.load("models/lang_emb.npy")
     ret[LangUtils.LANG_EMB_OBS_KEY] = np.array(lang_emb)
     return ret
 
