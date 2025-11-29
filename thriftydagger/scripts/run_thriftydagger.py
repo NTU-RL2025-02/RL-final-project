@@ -305,7 +305,7 @@ if __name__ == "__main__":
         help="True if you want to collect offline human demos",
     )
     parser.add_argument(
-        "--iters", type=int, default=5, help="number of DAgger-style iterations"
+        "--iters", type=int, default=20, help="number of DAgger-style iterations"
     )
     parser.add_argument(
         "--targetrate", type=float, default=0.01, help="target context switching rate"
