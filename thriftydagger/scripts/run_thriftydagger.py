@@ -34,10 +34,6 @@ from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
 from thrifty.robomimic_expert import RobomimicExpert
 from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
 
-env_robomimic, ckpt_dict = env_from_checkpoint(
-    ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth", render=False
-)
-
 
 def get_real_depth_map(env, depth_map):
     """
@@ -249,6 +245,10 @@ def main(args):
         config, render, expert_pol=expert_pol
     )
 
+    env_robomimic, _ = env_from_checkpoint(
+        ckpt_path=args.expert_policy_file, render=False
+    )
+
     # ---- 決定 expert_pol ----
     if args.algo_sup:
         expert = HardcodedPolicy(env).act
@@ -271,8 +271,8 @@ def main(args):
     # ---- 主訓練流程 ----
     try:
         thrifty(
-            env,
-            env_robomimic,
+            env=env,
+            env_robomimic=env_robomimic,
             iters=args.iters,
             logger_kwargs=logger_kwargs,
             device_idx=args.device,
