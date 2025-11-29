@@ -19,6 +19,11 @@ from thrifty.utils.logx import EpochLogger
 from thrifty.algos.buffer import ReplayBuffer, QReplayBuffer
 
 
+def get_observation_for_thrifty_dagger(env):
+    obs_dict = env.env.observation_spec()
+    return np.concat([obs_dict["robot0_proprio-state"], obs_dict["object-state"]])
+
+
 # ----------------------------------------------------------------------
 # Config dataclasses（集中 magic numbers）
 # ----------------------------------------------------------------------
@@ -243,8 +248,9 @@ def test_agent(
         expert_policy.start_episode()
         recovery_policy.start_episode()
 
-        o, terminated = env.reset(), False
         ep_ret, ep_ret2, ep_len = 0.0, 0.0, 0
+        o_robomimic, terminated = env_robomimic.reset(), False
+        o = get_observation_for_thrifty_dagger(env)
 
         while not terminated:
             obs.append(o)
@@ -252,7 +258,9 @@ def test_agent(
             a = np.clip(a, -act_limit, act_limit)
             act.append(a)
 
-            o, r, terminated, _ = env.step(a)
+            o_robomimic, r, terminated, _ = env_robomimic.step(a)
+            o = get_observation_for_thrifty_dagger(env)
+
             if robosuite:
                 terminated = (ep_len + 1 >= horizon) or env._check_success()
                 ep_ret2 += float(env._check_success())
@@ -576,6 +584,7 @@ def log_epoch(
 
 def thrifty(
     env: Any,
+    env_robomimic: Any,
     iters: int = 5,
     actor_critic: Any = core.Ensemble,
     ac_kwargs: Dict[str, Any] = dict(),
@@ -587,7 +596,7 @@ def thrifty(
     batch_size: int = 100,
     logger_kwargs: Dict[str, Any] = dict(),
     num_test_episodes: int = 10,
-    bc_epochs: int = 5,
+    bc_epochs: int = 20,
     input_file: str = "data.pkl",
     device_idx: int = 0,
     expert_policy: Optional[Any] = None,
@@ -808,7 +817,9 @@ def thrifty(
             expert_policy.start_episode()
             recovery_policy.start_episode()
 
-            o, done = env.reset(), False
+            o_robomimic, done = env_robomimic.reset(), False
+            o = get_observation_for_thrifty_dagger(env)
+
             expert_mode = False
             safety_mode = False
             ep_len = 0
@@ -830,6 +841,8 @@ def thrifty(
             while step_count < obs_per_iter and not done:
                 a_robot = ac.act(o)
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
+                a_expert = expert_policy(o_robomimic)
+                a_recovery = recovery_policy(o_robomimic)
 
                 if not expert_mode:
                     # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
@@ -840,9 +853,6 @@ def thrifty(
                 # expert_mode：由 human expert 控制
                 # --------------------------------------------------
                 if expert_mode:
-                    a_expert = expert_policy(
-                        extra_obs_extractor(env, env.env.env.latest_obs_dict)
-                    )
                     a_expert = np.clip(a_expert, -act_limit, act_limit)
 
                     replay_buffer.store(o, a_expert)
@@ -856,11 +866,14 @@ def thrifty(
                         print("Switch to Robot")
                         expert_mode = False
                         num_switch_to_robot += 1
-                        o2, _, done, _ = env.step(
+
+                        o_robomimic, _, done, _ = env_robomimic.step(
                             a_expert
                         )  # FIXME: Should this be a_robot? @Sheng-Yu-Cheng
+                        o2 = get_observation_for_thrifty_dagger(env)
                     else:
-                        o2, _, done, _ = env.step(a_expert)
+                        o_robomimic, _, done, _ = env_robomimic.step(a_expert)
+                        o2 = get_observation_for_thrifty_dagger(env)
 
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised (human / recovery)
@@ -874,33 +887,32 @@ def thrifty(
                 # safety_mode：由 recovery policy 控制
                 # --------------------------------------------------
                 elif safety_mode:
-                    a_recovery = recovery_policy(
-                        extra_obs_extractor(env, env.env.env.latest_obs_dict)
-                    )
-                    a_recovery = np.clip(a_recovery, -act_limit, act_limit)
+                    # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
+                    a_expert = np.clip(a_expert, -act_limit, act_limit)
+                    replay_buffer.store(o, a_expert)
+                    risk.append(float(ac.safety(o, a_expert)))
 
-                    replay_buffer.store(o, a_recovery)
-                    risk.append(float(ac.safety(o, a_recovery)))
-
-                    if np.sum((a_robot - a_recovery) ** 2) < switch2robot_thresh and (
+                    if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh and (
                         not q_learning or ac.safety(o, a_robot) > switch2robot_thresh2
                     ):
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
-                        o2, _, done, _ = env.step(
-                            a_recovery
+                        o_robomimic, _, done, _ = env_robomimic.step(
+                            a_expert
                         )  # FIXME: Should this be a_robot? @Sheng-Yu-Cheng
+                        o2 = get_observation_for_thrifty_dagger(env)
                     else:
-                        o2, _, done, _ = env.step(a_recovery)
+                        o_robomimic, _, done, _ = env_robomimic.step(a_expert)
+                        o2 = get_observation_for_thrifty_dagger(env)
 
-                    act.append(a_recovery)
+                    act.append(a_expert)
                     sup.append(1)
 
                     s_flag = env._check_success()
                     qbuffer.store(
                         o,
-                        a_recovery,
+                        a_expert,
                         o2,
                         int(s_flag),
                         (ep_len + 1 >= horizon) or s_flag,
@@ -926,7 +938,8 @@ def thrifty(
                 # --------------------------------------------------
                 else:
                     risk.append(float(ac.safety(o, a_robot)))
-                    o2, _, done, _ = env.step(a_robot)
+                    o_robomimic, _, done, _ = env_robomimic.step(a_robot)
+                    o = get_observation_for_thrifty_dagger(env)
 
                     act.append(a_robot)
                     sup.append(0)

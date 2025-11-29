@@ -34,6 +34,10 @@ from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
 from thrifty.robomimic_expert import RobomimicExpert
 from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
 
+env_robomimic, ckpt_dict = env_from_checkpoint(
+    ckpt_path="models/model_epoch_2000_low_dim_v15_success_0.5.pth", render=False
+)
+
 
 def get_real_depth_map(env, depth_map):
     """
@@ -151,36 +155,42 @@ def create_env(config, render, expert_pol=None):
 
     expert_pol: 如果是 RobomimicExpert，就在這裡綁 env。
     """
-    env = suite.make(
-        **config,
-        has_renderer=render,
-        has_offscreen_renderer=False,
-        render_camera="agentview",
-        ignore_done=True,
-        use_camera_obs=False,  # low_dim expert，不用影像
-        reward_shaping=True,
-        control_freq=20,
-        hard_reset=True,
-        use_object_obs=True,
-    )
+    # env = suite.make(
+    #     **config,
+    #     has_renderer=render,
+    #     has_offscreen_renderer=False,
+    #     render_camera="agentview",
+    #     ignore_done=True,
+    #     use_camera_obs=False,  # low_dim expert，不用影像
+    #     reward_shaping=True,
+    #     control_freq=20,
+    #     hard_reset=True,
+    #     use_object_obs=True,
+    # )
 
-    obs_cacher = ObsCachingWrapper(env)
+    obs_cacher = ObsCachingWrapper(env_robomimic.env)
     if isinstance(expert_pol, RobomimicExpert):
         print("Binding environment wrapper to RobomimicExpert...")
         expert_pol.set_env(obs_cacher)
 
     env = GymWrapper(
         obs_cacher,
-        keys=[
-            "robot0_eef_pos",
-            "robot0_eef_quat",
-            "robot0_gripper_qpos",
-            "object",
-        ],
+        # keys=[
+        #     "robot0_eef_pos",
+        #     "robot0_eef_quat",
+        #     "robot0_gripper_qpos",
+        #     "object",
+        # ],
     )
     env = VisualizationWrapper(env, indicator_configs=None)
     env = CustomWrapper(env, render=render)
+    # o1 = env.env.env.step([0, 0, 0, 0, 0, 0, 0])[0]
+    # o2 = env.env.env.env.latest_obs_dict
+    # o3 = env_robomimic
+    # print("\033[32m", o2, "\033[0m")
+    # print("\033[32m", o1, "\033[0m")
 
+    # from sys import exit; exit();
     arm = "right"
     config_name = "single-arm-opposed"
     active_robot = env.robots[arm == "left"]  # 與你原來邏輯一致
@@ -262,6 +272,7 @@ def main(args):
     try:
         thrifty(
             env,
+            env_robomimic,
             iters=args.iters,
             logger_kwargs=logger_kwargs,
             device_idx=args.device,
@@ -317,7 +328,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--demonstration_set_file",
         type=str,
-        default="models/model_epoch_2000_low_dim_v15_success_0.5-10.pkl",
+        default="models/model_epoch_2000_low_dim_v15_success_0.5-1000.pkl",
         help="filepath to expert data pkl file",
     )
 
