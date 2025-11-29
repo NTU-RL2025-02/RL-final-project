@@ -8,7 +8,6 @@ from robomimic.algo import algo_factory
 from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoint
 from thrifty.robomimic_expert import RobomimicExpert
 from copy import deepcopy
-from deepdiff import DeepDiff
 
 # copy from robosuite.GymWrapper
 def _flatten_obs(obs_dict, verbose=False):
@@ -267,12 +266,12 @@ env = CustomWrapper(env, render=False)
 # print(env.env.env.env.env)
 # print("\033[32m ref", robomimic_env, "\033[0m")
 
-N = 100
+N = 10000
 obs_list, act_list = [], []
 ep = 1
 while ep <= N:
     ep_obs, ep_act = [], []
-    policy.start_episode()  # important
+    # policy.start_episode()  # important
     # o, done = env.reset(), False
     robomimic_obs, robomimic_done = robomimic_env.reset(), False
     # print(f"raw robosuite: {obs_cacher.latest_obs_dict}")

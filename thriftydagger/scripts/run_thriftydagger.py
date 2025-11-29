@@ -274,31 +274,31 @@ if __name__ == "__main__":
             },
         },
     }
-    # wandb.init(
-    #     entity="aawrail-RL2025",
-    #     project="final_project_exp0",
-    #     name=args.exp_name,
-    #     config={
-    #         "seed": args.seed,
-    #         "device": args.device,
-    #         "iters": args.iters,
-    #         "target_rate": args.targetrate,
-    #         "environment": args.environment,
-    #         "max_expert_query": args.max_expert_query,
-    #         "algo": (
-    #             "hgdagger"
-    #             if args.hgdagger
-    #             else (
-    #                 "lazydagger"
-    #                 if args.lazydagger
-    #                 else "thrifty_q" if True else "thrifty"
-    #             )
-    #         ),
-    #         "algo_sup": args.algo_sup,
-    #         "gen_data": args.gen_data,
-    #         "controller_configs": config["controller_configs"],
-    #     },
-    # )
+    wandb.init(
+        entity="aawrail-RL2025",
+        project="final_project_exp0",
+        name=args.exp_name,
+        config={
+            "seed": args.seed,
+            "device": args.device,
+            "iters": args.iters,
+            "target_rate": args.targetrate,
+            "environment": args.environment,
+            "max_expert_query": args.max_expert_query,
+            "algo": (
+                "hgdagger"
+                if args.hgdagger
+                else (
+                    "lazydagger"
+                    if args.lazydagger
+                    else "thrifty_q" if True else "thrifty"
+                )
+            ),
+            "algo_sup": args.algo_sup,
+            "gen_data": args.gen_data,
+            "controller_configs": config["controller_configs"],
+        },
+    )
 
     # 建立 robosuite 環境
     # env = suite.make(
@@ -454,7 +454,7 @@ if __name__ == "__main__":
                 expert_policy=expert_pol,
                 suboptimal_policy=suboptimal_policy,
                 extra_obs_extractor=get_observation,
-                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-100-linear.pkl",
+                input_file="models/model_epoch_2000_low_dim_v15_success_0.5-1000.pkl",
                 robosuite=True,
                 robosuite_cfg=robosuite_cfg,
                 q_learning=True,

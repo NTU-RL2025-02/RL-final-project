@@ -293,7 +293,7 @@ def thrifty(
     batch_size=100,
     logger_kwargs=dict(),
     num_test_episodes=10,
-    bc_epochs=5,
+    bc_epochs=20,
     input_file="data.pkl",
     device_idx=0,
     expert_policy=None,

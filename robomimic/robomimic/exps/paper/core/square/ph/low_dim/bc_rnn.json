@@ -16,7 +16,7 @@
             "epochs": [],
             "on_best_validation": false,
             "on_best_rollout_return": false,
-            "on_best_rollout_success_rate": true
+            "on_best_rollout_success_rate": true  
         },
         "epoch_every_n_steps": 200,
         "validation_epoch_every_n_steps": 10,
@@ -31,7 +31,7 @@
             "n": 50,
             "horizon": 200,
             "rate": 10,
-            "warmstart": 0,
+            "warmstart": 90,
             "terminate_on_success": true
         },
         "env_meta_update_dict": {},
@@ -45,7 +45,7 @@
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
         "hdf5_load_next_obs": false,
-        "hdf5_normalize_obs": false,
+        "hdf5_normalize_obs": true,
         "hdf5_filter_key": "train",
         "hdf5_validation_filter_key": "valid",
         "seq_length": 10,
@@ -79,7 +79,7 @@
                 "learning_rate": {
                     "initial": 0.0001,
                     "decay_factor": 0.1,
-                    "epoch_schedule": [],
+                    "epoch_schedule": [100, 300],
                     "scheduler_type": "multistep"
                 },
                 "regularization": {
