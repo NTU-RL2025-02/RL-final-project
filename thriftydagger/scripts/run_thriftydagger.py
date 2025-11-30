@@ -197,7 +197,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("exp_name", type=str)
     parser.add_argument("--seed", "-s", type=int, default=0)
-    parser.add_argument("--device", type=int, default=-1)
+    parser.add_argument("--device", type=int, default=0)
     parser.add_argument(
         "--gen_data",
         action="store_true",
