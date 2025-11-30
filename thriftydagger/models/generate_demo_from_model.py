@@ -188,7 +188,7 @@ def get_real_depth_map(env, depth_map):
 #     }
 
 
-model_name = "model_epoch_2000_low_dim_v15_success_0.5"
+model_name = "model_epoch_1150_low_dim_v15_success_0.74"
 ckpt = f"models/{model_name}.pth"
 robomimic_env, ckpt_dict = env_from_checkpoint(ckpt_path=ckpt, render=False)
 policy, _ = policy_from_checkpoint(
@@ -256,6 +256,7 @@ env = CustomWrapper(env, render=False)
 # print("\033[32m ref", robomimic_env, "\033[0m")
 
 N = 10000
+ep_record = [2000 * i for i in (1, 2, 3, 4, 5)]
 obs_list, act_list = [], []
 ep = 1
 while ep <= N:
@@ -298,11 +299,11 @@ while ep <= N:
         ep += 1
         obs_list.extend(ep_obs)
         act_list.extend(ep_act)
-
-pickle.dump(
-    {"obs": np.array(obs_list), "act": np.array(act_list)},
-    open(f"models/{model_name}-{N}.pkl", "wb"),
-)
+    if ep in ep_record:
+        pickle.dump(
+            {"obs": np.array(obs_list), "act": np.array(act_list)},
+            open(f"models/{model_name}-{ep}.pkl", "wb"),
+        )
 
 # ep = 1
 # while ep <= 300:
