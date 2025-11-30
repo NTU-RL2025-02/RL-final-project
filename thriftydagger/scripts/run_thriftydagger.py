@@ -145,7 +145,7 @@ def build_robosuite_config(args):
     }
 
 
-def create_env(config, render, expert_pol=None):
+def create_env(config, render, env_robomimic, expert_pol=None):
     """
     建立 robosuite env + wrapper，回傳 (env, active_robot, robosuite_cfg)
 
@@ -241,12 +241,12 @@ def main(args):
 
     # ---- 建 env ----
     # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
-    env, active_robot, arm_, config_, robosuite_cfg = create_env(
-        config, render, expert_pol=expert_pol
-    )
-
     env_robomimic, _ = env_from_checkpoint(
         ckpt_path=args.expert_policy_file, render=False
+    )
+
+    env, active_robot, arm_, config_, robosuite_cfg = create_env(
+        config, render, env_robomimic=env_robomimic, expert_pol=expert_pol
     )
 
     # ---- 決定 expert_pol ----
