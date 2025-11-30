@@ -5,7 +5,6 @@
 conda activate rl-final
 
 nohup python3 scripts/run_thriftydagger.py \
-    exp_name \
     --seed 0 \
     --device 0 \
     --iters 20 \
@@ -15,4 +14,4 @@ nohup python3 scripts/run_thriftydagger.py \
     --demonstration_set_file models/model_epoch_2000_low_dim_v15_success_0.5-1000.pkl \
     --max_expert_query 2000 \
     --environment NutAssembly \
-
+    meeting_exp_1130 \

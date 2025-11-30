@@ -11,3 +11,4 @@ dist/
 _build/
 plots/
 wandb/
+nohup.out
