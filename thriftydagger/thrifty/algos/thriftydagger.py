@@ -943,7 +943,7 @@ def thrifty(
                 else:
                     risk.append(float(ac.safety(o, a_robot)))
                     o_robomimic, _, done, _ = env_robomimic.step(a_robot)
-                    o = get_observation_for_thrifty_dagger(env)
+                    o2 = get_observation_for_thrifty_dagger(env)
 
                     act.append(a_robot)
                     sup.append(0)
