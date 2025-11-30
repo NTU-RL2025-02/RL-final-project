@@ -12,3 +12,4 @@ _build/
 plots/
 wandb/
 nohup.out
+output*.txt
