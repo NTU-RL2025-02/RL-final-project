@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="thrifty_1130"
+EXP_NAME="thrifty_1130-target_rate=0.01"
 SESSION_NAME="thriftydagger_$EXP_NAME"
 
 # 檢查 session 是否已存在
