@@ -43,6 +43,7 @@ pip install torch torchvision
 ```sh
 pip install -e robomimic
 pip install -e thriftydagger "robosuite==1.5.1" "mujoco>=2.3" "gymnasium>=0.29"
+pip install -e lunar_lander
 ```
 
 4. (Optional) For headless rendering set `export MUJOCO_GL=egl` (Linux) or `export MUJOCO_GL=glfw` (Mac).

@@ -1,0 +1,172 @@
+# run_thriftydagger.py
+# Script for running ThriftyDAgger on robosuite environments
+
+# --------------------------------------------------------------
+# Imports
+# --------------------------------------------------------------
+
+# standard libraries
+import numpy as np
+import sys
+import time
+import torch
+import wandb
+
+# robosuite
+import robosuite as suite
+from robosuite.controllers import load_composite_controller_config
+from robosuite.wrappers import VisualizationWrapper
+from robosuite.wrappers import GymWrapper
+
+# thriftydagger
+from lunar_lander.algos.thriftydagger import thrifty, generate_offline_data
+from lunar_lander.utils.run_utils import setup_logger_kwargs
+
+import gymnasium as gym
+from stable_baselines3 import SAC
+
+
+def load_lunar_expert(model_path: str, device: str = "cpu"):
+    """
+    假設你的 expert 是 stable-baselines3 SAC
+    回傳一個 callable: expert(obs) -> action
+    """
+    model = SAC.load(model_path, device=device)
+
+    def expert_policy(obs):
+        # thrifty 一般會用 numpy obs
+        # sb3 的 predict 會回傳 (action, state)
+        action, _ = model.predict(obs, deterministic=True)
+        return action
+
+    return expert_policy, model
+
+
+def main(args):
+    # ---- load expert policy ----
+    # 這裡用你搬到比較短路徑的 expert model
+    # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    expert_pol, expert_model = load_lunar_expert(
+        model_path=args.expert_policy_file, device=device
+    )
+
+    recovery_policy, recovery_model = load_lunar_expert(
+        model_path=args.recovery_policy_file, device=device
+    )
+
+    render = not args.no_render
+
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+
+    # ---- wandb ----
+    wandb.init(
+        entity="aawrail-RL2025",
+        project="final_project_exp0",
+        name=args.exp_name,
+        config={
+            "seed": args.seed,
+            "device": args.device,
+            "iters": args.iters,
+            "target_rate": args.targetrate,
+            "environment": args.environment,
+            "max_expert_query": args.max_expert_query,
+            "expert_policy_file": args.expert_policy_file,
+            "recovery_policy_file": args.recovery_policy_file,
+            "demonstration_set_file": args.demonstration_set_file,
+        },
+    )
+
+    # ---- 建 env ----
+    # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
+    env = gym.make(
+        "LunarLander-v3",
+        continuous=True,
+        gravity=-10.0,
+        enable_wind=False,
+        wind_power=15.0,
+        turbulence_power=1.5,
+        render_mode="human" if render else None,
+    )
+    max_ep_len = getattr(env, "_max_episode_steps", 1000)
+    gym_cfg = {"MAX_EP_LEN": max_ep_len}
+
+    # ---- 主訓練流程 ----
+    try:
+        thrifty(
+            env=env,
+            iters=args.iters,
+            logger_kwargs=logger_kwargs,
+            device_idx=args.device,
+            target_rate=args.targetrate,
+            seed=args.seed,
+            expert_policy=expert_pol,
+            recovery_policy=recovery_policy,
+            input_file=args.demonstration_set_file,
+            robosuite=False,
+            gym_cfg=gym_cfg,  # 或者直接傳 None
+            q_learning=True,
+            init_model=args.eval,
+            max_expert_query=args.max_expert_query,
+        )
+    except Exception:
+        wandb.finish(exit_code=1)
+        raise
+    else:
+        # 正常跑完
+        wandb.finish(exit_code=0)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("exp_name", type=str)
+    parser.add_argument("--seed", "-s", type=int, default=0)
+    parser.add_argument("--device", type=int, default=0)
+    parser.add_argument(
+        "--iters", type=int, default=20, help="number of DAgger-style iterations"
+    )
+    parser.add_argument(
+        "--targetrate", type=float, default=0.01, help="target context switching rate"
+    )
+
+    parser.add_argument(
+        "--expert_policy_file",
+        type=str,
+        default="models/best_model.zip",
+        help="filepath to expert model zip file",
+    )
+
+    parser.add_argument(
+        "--recovery_policy_file",
+        type=str,
+        default="models/best_model.zip",
+        help="filepath to recovery model zip file",
+    )
+
+    parser.add_argument(
+        "--demonstration_set_file",
+        type=str,
+        default="models/offline_dataset.pkl",
+        help="filepath to expert data pkl file",
+    )
+
+    parser.add_argument(
+        "--max_expert_query",
+        type=int,
+        default=2000,
+        help="maximum number of expert queries allowed",
+    )
+    parser.add_argument("--environment", type=str, default="LunarLander-v3")
+    parser.add_argument("--no_render", action="store_true")
+    parser.add_argument(
+        "--eval",
+        type=str,
+        default=None,
+        help="filepath to saved pytorch model to initialize weights",
+    )
+    args = parser.parse_args()
+
+    main(args)
