@@ -721,7 +721,8 @@ def thrifty(
             expert_policy.start_episode()
             recovery_policy.start_episode()
 
-            o, done = env.reset(), False
+            o, _ = env.reset()
+            done = False
 
             expert_mode = False
             safety_mode = False
