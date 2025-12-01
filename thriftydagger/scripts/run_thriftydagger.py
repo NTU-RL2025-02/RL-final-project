@@ -288,8 +288,12 @@ def main(args):
             init_model=args.eval,
             max_expert_query=args.max_expert_query,
         )
-    finally:
-        wandb.finish()
+    except Exception:
+        wandb.finish(exit_code=1)
+        raise
+    else:
+        # 正常跑完
+        wandb.finish(exit_code=0)
 
 
 if __name__ == "__main__":
