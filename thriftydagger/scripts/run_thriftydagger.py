@@ -137,6 +137,7 @@ def build_robosuite_config(args):
             }
         },
     }
+    print("env:", robosuite_env_name)
 
     return {
         "env_name": robosuite_env_name,
@@ -151,32 +152,27 @@ def create_env(config, render, env_robomimic, expert_pol=None):
 
     expert_pol: 如果是 RobomimicExpert，就在這裡綁 env。
     """
-    # env = suite.make(
-    #     **config,
-    #     has_renderer=render,
-    #     has_offscreen_renderer=False,
-    #     render_camera="agentview",
-    #     ignore_done=True,
-    #     use_camera_obs=False,  # low_dim expert，不用影像
-    #     reward_shaping=True,
-    #     control_freq=20,
-    #     hard_reset=True,
-    #     use_object_obs=True,
-    # )
-
-    obs_cacher = ObsCachingWrapper(env_robomimic.env)
+    env = suite.make(
+        **config,
+        has_renderer=render,
+        has_offscreen_renderer=False,
+        render_camera="agentview",
+        single_object_mode=2,
+        nut_type="round",
+        ignore_done=True,
+        use_camera_obs=False,  # low_dim expert，不用影像
+        reward_shaping=True,
+        control_freq=20,
+        hard_reset=True,
+        use_object_obs=True,
+    )
+    obs_cacher = ObsCachingWrapper(env)
     if isinstance(expert_pol, RobomimicExpert):
         print("Binding environment wrapper to RobomimicExpert...")
         expert_pol.set_env(obs_cacher)
 
     env = GymWrapper(
-        obs_cacher,
-        # keys=[
-        #     "robot0_eef_pos",
-        #     "robot0_eef_quat",
-        #     "robot0_gripper_qpos",
-        #     "object",
-        # ],
+        obs_cacher
     )
     env = VisualizationWrapper(env, indicator_configs=None)
     env = CustomWrapper(env, render=render)
@@ -279,7 +275,7 @@ def main(args):
             target_rate=args.targetrate,
             seed=args.seed,
             expert_policy=expert,
-            recovery_policy=recovery_policy,
+            recovery_policy=expert,
             extra_obs_extractor=get_observation,
             input_file=args.demonstration_set_file,
             robosuite=True,

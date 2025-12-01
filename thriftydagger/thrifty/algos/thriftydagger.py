@@ -84,9 +84,9 @@ def generate_offline_data(
     while episode_idx < num_episodes:
         print(f"Episode #{episode_idx}")
         # 通知 expert / recovery policy 開始新的 episode
-        expert_policy.start_episode()
-        if recovery_policy is not None:
-            recovery_policy.start_episode()  # NOTE: 為啥會有這？ by AaW
+        # expert_policy.start_episode()
+        # if recovery_policy is not None:
+        #     recovery_policy.start_episode()  # NOTE: 為啥會有這？ by AaW
 
         o, total_ret, done, step_idx = env.reset(), 0.0, False, 0
         curr_obs, curr_act = [], []
@@ -319,6 +319,7 @@ def pretrain_policies(
     ]
 
     for net_idx in range(ac.num_nets):
+        print(f"Pretraining policy net #{net_idx}...", flush=True)
         if ac.num_nets > 1:
             print(f"Net #{net_idx}")
             tmp_buffer = ReplayBuffer(
@@ -333,6 +334,7 @@ def pretrain_policies(
             tmp_buffer = replay_buffer
 
         for epoch_idx in range(bc_epochs):
+            print(f"  Epoch #{epoch_idx}...", flush=True)
             loss_pi_vals: List[float] = []
 
             for step_idx in range(grad_steps):
@@ -343,6 +345,8 @@ def pretrain_policies(
 
             validation_losses: List[float] = []
             for sample_idx in range(len(held_out_data["obs"])):
+                print("    Valid Sample", sample_idx, flush=True)
+                print(len(held_out_data["obs"]), flush=True)
                 a_pred = ac.act(held_out_data["obs"][sample_idx], i=net_idx)
                 a_sup = held_out_data["act"][sample_idx]
                 validation_losses.append(float(np.sum(a_pred - a_sup) ** 2))
@@ -761,6 +765,7 @@ def thrifty(
     # ----------------------------------------------------------
     # 8. 利用 offline data 先做 pre-training (BC)
     # ----------------------------------------------------------
+    print("Pretraining policies with offline data...", flush=True)
     pi_optimizers = pretrain_policies(
         ac,
         replay_buffer,
@@ -774,6 +779,7 @@ def thrifty(
         device,
         pi_lr,
     )
+    print("Pretraining complete.", flush=True)
 
     # ----------------------------------------------------------
     # 9. 初始化統計量與 thresholds

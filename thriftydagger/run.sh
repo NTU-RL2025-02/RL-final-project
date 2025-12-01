@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="change_max_expert_query_calulation_20251201T1030"
+EXP_NAME="hard_code_20251201T1330"
 SESSION_NAME="thriftydagger_$EXP_NAME"
 
 # 檢查 session 是否已存在
@@ -25,6 +25,7 @@ python3 scripts/run_thriftydagger.py \
   --demonstration_set_file models/model_epoch_1150_low_dim_v15_success_0.74-10000.pkl \
   --max_expert_query 2000 \
   --environment SquareNutAssembly \
+  --algo_sup \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
 
