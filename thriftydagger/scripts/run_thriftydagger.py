@@ -178,6 +178,7 @@ def main(args):
             q_learning=True,
             init_model=args.eval,
             max_expert_query=args.max_expert_query,
+            num_test_episodes=args.num_test_episodes
         )
     except Exception:
         wandb.finish(exit_code=1)
@@ -232,6 +233,12 @@ if __name__ == "__main__":
         type=int,
         default=2000,
         help="maximum number of expert queries allowed",
+    )
+    parser.add_argument(
+        "--num_test_episodes",
+        type=int,
+        default=10,
+        help="number of agent being tested each episode",
     )
     parser.add_argument("--environment", type=str, default="NutAssembly")
     parser.add_argument("--no_render", action="store_true")

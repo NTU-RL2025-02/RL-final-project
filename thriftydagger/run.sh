@@ -25,6 +25,7 @@ python3 scripts/run_thriftydagger.py \
   --environment NutAssembly \
   --algo_sup \
   --no_render \
+  --num_test_episodes 20 \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
 
