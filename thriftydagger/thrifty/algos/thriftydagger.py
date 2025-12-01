@@ -845,8 +845,6 @@ def thrifty(
             while step_count < obs_per_iter and not done:
                 a_robot = ac.act(o)
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
-                a_expert = expert_policy(o_robomimic)
-                a_recovery = recovery_policy(o_robomimic)
 
                 if not expert_mode:
                     # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
@@ -857,6 +855,7 @@ def thrifty(
                 # expert_mode：由 human expert 控制
                 # --------------------------------------------------
                 if expert_mode:
+                    a_expert = expert_policy(o_robomimic)
                     a_expert = np.clip(a_expert, -act_limit, act_limit)
 
                     replay_buffer.store(o, a_expert)
@@ -891,6 +890,7 @@ def thrifty(
                 # safety_mode：由 recovery policy 控制
                 # --------------------------------------------------
                 elif safety_mode:
+                    a_recovery = recovery_policy(o_robomimic)
                     a_recovery = np.clip(a_recovery, -act_limit, act_limit)
                     replay_buffer.store(o, a_recovery)
                     risk.append(float(ac.safety(o, a_recovery)))
@@ -915,7 +915,7 @@ def thrifty(
                     s_flag = env._check_success()
                     qbuffer.store(
                         o,
-                        a_expert,
+                        a_recovery,
                         o2,
                         int(s_flag),
                         (ep_len + 1 >= horizon) or s_flag,
