@@ -187,7 +187,7 @@ def create_env(config, render, env_robomimic, expert_pol=None):
     config_name = "single-arm-opposed"
     active_robot = env.robots[arm == "left"]  # 與你原來邏輯一致
 
-    robosuite_cfg = {"MAX_EP_LEN": 175}
+    robosuite_cfg = {"MAX_EP_LEN": 300}
     return env, active_robot, arm, config_name, robosuite_cfg
 
 
