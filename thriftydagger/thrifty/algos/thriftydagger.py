@@ -230,7 +230,7 @@ def test_agent(
     expert_policy: Any,
     recovery_policy: Any,
     env: Any,
-    env_robomimic: Any, 
+    env_robomimic: Any,
     ac: Any,
     num_test_episodes: int,
     act_limit: float,
@@ -466,7 +466,7 @@ def retrain_qrisk(
     expert_policy: Any,
     recovery_policy: Any,
     env: Any,
-    env_robomimic: Any, 
+    env_robomimic: Any,
     act_limit: float,
     horizon: int,
     robosuite: bool,
@@ -492,7 +492,7 @@ def retrain_qrisk(
             expert_policy,
             recovery_policy,
             env,
-            env_robomimic, 
+            env_robomimic,
             ac,
             num_test_episodes,
             act_limit,
@@ -533,7 +533,7 @@ def log_epoch(
     total_env_interacts: int,
     online_burden: int,
     num_switch_to_human: int,
-    num_switch_to_human2: int,
+    num_switch_to_recovery: int,
     num_switch_to_robot: int,
     loss_pi: Optional[float],
     loss_q: Optional[float],
@@ -559,7 +559,7 @@ def log_epoch(
     print("TotalEnvInteracts", total_env_interacts)
     print("OnlineBurden", online_burden)
     print("NumSwitchToNov", num_switch_to_human)
-    print("NumSwitchToRisk", num_switch_to_human2)
+    print("NumSwitchToRisk", num_switch_to_recovery)
     print("NumSwitchBack", num_switch_to_robot)
 
     success_rate = (ep_num - fail_ct) / ep_num if ep_num > 0 else 0.0
@@ -574,7 +574,7 @@ def log_epoch(
     logger.log_tabular("TotalEnvInteracts", total_env_interacts)
     logger.log_tabular("OnlineBurden", online_burden)
     logger.log_tabular("NumSwitchToNov", num_switch_to_human)
-    logger.log_tabular("NumSwitchToRisk", num_switch_to_human2)
+    logger.log_tabular("NumSwitchToRisk", num_switch_to_recovery)
     logger.log_tabular("NumSwitchBack", num_switch_to_robot)
 
     logger.dump_tabular()
@@ -747,7 +747,7 @@ def thrifty(
             expert_policy,
             recovery_policy,
             env,
-            env_robomimic, 
+            env_robomimic,
             ac,
             num_test_episodes,
             act_limit,
@@ -799,7 +799,7 @@ def thrifty(
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
     num_switch_to_human = 0  # 因 novelty 切到 human 次數
-    num_switch_to_human2 = 0  # 因 risk 切到 human 次數
+    num_switch_to_recovery = 0  # 因 risk 切到 human 次數
     num_switch_to_robot = 0  # 從 human/recovery 切回 robot 次數
 
     # ----------------------------------------------------------
@@ -847,6 +847,7 @@ def thrifty(
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
                 a_expert = expert_policy(o_robomimic)
                 a_recovery = recovery_policy(o_robomimic)
+                a_recovery = a_expert  # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
 
                 if not expert_mode:
                     # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
@@ -891,26 +892,25 @@ def thrifty(
                 # safety_mode：由 recovery policy 控制
                 # --------------------------------------------------
                 elif safety_mode:
-                    # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
-                    a_expert = np.clip(a_expert, -act_limit, act_limit)
-                    replay_buffer.store(o, a_expert)
-                    risk.append(float(ac.safety(o, a_expert)))
+                    a_recovery = np.clip(a_recovery, -act_limit, act_limit)
+                    replay_buffer.store(o, a_recovery)
+                    risk.append(float(ac.safety(o, a_recovery)))
 
-                    if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh and (
+                    if np.sum((a_robot - a_recovery) ** 2) < switch2robot_thresh and (
                         not q_learning or ac.safety(o, a_robot) > switch2robot_thresh2
                     ):
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
                         o_robomimic, _, done, _ = env_robomimic.step(
-                            a_expert
+                            a_recovery
                         )  # FIXME: Should this be a_robot? @Sheng-Yu-Cheng
                         o2 = get_observation_for_thrifty_dagger(env)
                     else:
-                        o_robomimic, _, done, _ = env_robomimic.step(a_expert)
+                        o_robomimic, _, done, _ = env_robomimic.step(a_recovery)
                         o2 = get_observation_for_thrifty_dagger(env)
 
-                    act.append(a_expert)
+                    act.append(a_recovery)
                     sup.append(1)
 
                     s_flag = env._check_success()
@@ -933,7 +933,7 @@ def thrifty(
 
                 elif q_learning and ac.safety(o, a_robot) < switch2human_thresh2:
                     print("Switch to Human (Risk)")
-                    num_switch_to_human2 += 1
+                    num_switch_to_recovery += 1
                     safety_mode = True
                     continue
 
@@ -1049,7 +1049,7 @@ def thrifty(
             expert_policy,
             recovery_policy,
             env,
-            env_robomimic, 
+            env_robomimic,
             act_limit,
             horizon,
             robosuite,
@@ -1075,7 +1075,7 @@ def thrifty(
             total_env_interacts,
             online_burden,
             num_switch_to_human,
-            num_switch_to_human2,
+            num_switch_to_recovery,
             num_switch_to_robot,
             avg_loss_pi,
             avg_loss_q,
@@ -1085,6 +1085,6 @@ def thrifty(
         # --------------------------------------------------
         # 10-4. 早停條件：supervisor label 達上限
         # --------------------------------------------------
-        if online_burden >= max_expert_query:
+        if num_switch_to_human + num_switch_to_recovery >= max_expert_query:
             print("Reached max expert queries, stopping training.")
             break
