@@ -167,14 +167,15 @@ def test_agent(
             act_list.append(a)
 
             o, r, terminated, truncated, _ = env.step(a)
-            success = r >= 200
+            ep_ret += r
+
+            success = ep_ret >= 200
             done = terminated or truncated or success or (ep_len + 1 >= horizon)
 
             ep_ret2 += float(success)
             done_list.append(done)
             reward_list.append(int(success))
 
-            ep_ret += r
             ep_len += 1
 
         print(f"episode #{episode_idx} success? {reward_list[-1]}")
@@ -727,12 +728,13 @@ def thrifty(
             expert_mode = False
             safety_mode = False
             ep_len = 0
+            episode_reward = 0
 
             # episode 累積的軌跡
             obs, act, rew, done_flags, sup, var, risk = (
                 [o],  # 初始 obs
                 [],  # actions
-                [],  # rewards（成功:1 / 失敗:0）
+                [],  # rewards
                 [],  # done flags
                 [],  # sup 標記（1: supervised, 0: robot）
                 [ac.variance(o)],  # 初始 state 的 variance
@@ -774,11 +776,13 @@ def thrifty(
 
                         o2, r, terminated, truncated, _ = env.step(a_expert)
                         done = terminated or truncated
-                        s_flag = r >= 200
+                        episode_reward += r
+                        s_flag = episode_reward >= 200
                     else:
                         o2, r, terminated, truncated, _ = env.step(a_expert)
                         done = terminated or truncated
-                        s_flag = r >= 200
+                        episode_reward += r
+                        s_flag = episode_reward >= 200
 
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised (human / recovery)
@@ -800,14 +804,16 @@ def thrifty(
                         safety_mode = False
                         num_switch_to_robot += 1
                         o2, r, terminated, truncated, _ = env.step(a_recovery)
-                        s_flag = r >= 200
+                        episode_reward += r
+                        s_flag = episode_reward >= 200
                         done = (
                             terminated or truncated or s_flag or (ep_len + 1 >= horizon)
                         )
 
                     else:
                         o2, r, terminated, truncated, _ = env.step(a_recovery)
-                        s_flag = r >= 200
+                        episode_reward += r
+                        s_flag = episode_reward >= 200
                         done = (
                             terminated or truncated or s_flag or (ep_len + 1 >= horizon)
                         )
@@ -838,7 +844,8 @@ def thrifty(
                 else:
                     risk.append(float(ac.safety(o, a_robot)))
                     o2, r, terminated, truncated, _ = env.step(a_robot)
-                    s_flag = r >= 200
+                    episode_reward += r
+                    s_flag = episode_reward >= 200
                     done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_robot)
