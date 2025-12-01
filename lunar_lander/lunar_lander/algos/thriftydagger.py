@@ -167,8 +167,8 @@ def test_agent(
             act_list.append(a)
 
             o, r, terminated, truncated, _ = env.step(a)
-            done = terminated or truncated
             success = r >= 200
+            done = terminated or truncated or success or (ep_len + 1 >= horizon)
 
             ep_ret2 += float(success)
             done_list.append(done)
