@@ -603,7 +603,6 @@ def thrifty(
     device_idx: int = 0,
     expert_policy: Optional[Any] = None,
     recovery_policy: Optional[Any] = None,
-    extra_obs_extractor: Optional[Any] = None,
     num_nets: int = 5,
     target_rate: float = 0.01,
     robosuite: bool = False,

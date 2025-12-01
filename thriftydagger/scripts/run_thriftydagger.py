@@ -22,81 +22,12 @@ from robosuite.wrappers import GymWrapper
 # from robosuite.devices.mjgui import MJGUI
 # from robosuite.devices import Keyboard
 
-# robomimic
-import robomimic.utils.obs_utils as ObsUtils
-from robomimic.utils.file_utils import env_from_checkpoint, policy_from_checkpoint
-
 # thriftydagger
 from thrifty.algos.thriftydagger import thrifty, generate_offline_data
 from thrifty.algos.lazydagger import lazy
 from thrifty.utils.run_utils import setup_logger_kwargs
 from thrifty.utils.hardcoded_nut_assembly import HardcodedPolicy
-from thrifty.robomimic_expert import RobomimicExpert
 from thrifty.utils.wrapper import ObsCachingWrapper, CustomWrapper
-
-
-def get_real_depth_map(env, depth_map):
-    """
-    Reproduced from https://github.com/ARISE-Initiative/robosuite/blob/c57e282553a4f42378f2635b9a3cbc4afba270fd/robosuite/utils/camera_utils.py#L106
-    since older versions of robosuite do not have this conversion from normalized depth values returned by MuJoCo
-    to real depth values.
-    """
-    # Make sure that depth values are normalized
-    assert np.all(depth_map >= 0.0) and np.all(depth_map <= 1.0)
-    extent = env.sim.model.stat.extent
-    far = env.sim.model.vis.map.zfar * extent
-    near = env.sim.model.vis.map.znear * extent
-    return near / (1.0 - depth_map * (1.0 - near / far))
-
-
-def get_observation(env, di):
-    """
-    Get current environment observation dictionary.
-
-    Args:
-        di (dict): current raw observation dictionary from robosuite to wrap and provide
-            as a dictionary. If not provided, will be queried from robosuite.
-    """
-    ret = {}
-    for k in di:
-        if (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(
-            key=k, obs_modality="rgb"
-        ):
-            # by default images from mujoco are flipped in height
-            ret[k] = di[k][::-1].copy()
-        elif (k in ObsUtils.OBS_KEYS_TO_MODALITIES) and ObsUtils.key_is_obs_modality(
-            key=k, obs_modality="depth"
-        ):
-            # by default depth images from mujoco are flipped in height
-            ret[k] = di[k][::-1].copy()
-            if len(ret[k].shape) == 2:
-                ret[k] = ret[k][..., None]  # (H, W, 1)
-            assert len(ret[k].shape) == 3
-            # scale entries in depth map to correspond to real distance.
-            ret[k] = get_real_depth_map(ret[k])
-
-    # "object" key contains object information
-    if "object-state" in di:
-        ret["object"] = np.array(di["object-state"])
-
-    for robot in env.robots:
-        # add all robot-arm-specific observations. Note the (k not in ret) check
-        # ensures that we don't accidentally add robot wrist images a second time
-        pf = robot.robot_model.naming_prefix
-        for k in di:
-            if (
-                k.startswith(pf)
-                and (k not in ret)
-                and (not k.endswith("proprio-state"))
-            ):
-                ret[k] = np.array(di[k])
-
-    import robomimic.utils.lang_utils as LangUtils
-
-    lang_emb = np.load("models/lang_emb.npy")
-    ret[LangUtils.LANG_EMB_OBS_KEY] = np.array(lang_emb)
-    return ret
-
 
 def build_robosuite_config(args):
     """
@@ -146,11 +77,9 @@ def build_robosuite_config(args):
     }
 
 
-def create_env(config, render, env_robomimic, expert_pol=None):
+def create_env(config, render):
     """
     建立 robosuite env + wrapper，回傳 (env, active_robot, robosuite_cfg)
-
-    expert_pol: 如果是 RobomimicExpert，就在這裡綁 env。
     """
     env = suite.make(
         **config,
@@ -167,45 +96,20 @@ def create_env(config, render, env_robomimic, expert_pol=None):
         use_object_obs=True,
     )
     obs_cacher = ObsCachingWrapper(env)
-    if isinstance(expert_pol, RobomimicExpert):
-        print("Binding environment wrapper to RobomimicExpert...")
-        expert_pol.set_env(obs_cacher)
-
     env = GymWrapper(
         obs_cacher
     )
     env = VisualizationWrapper(env, indicator_configs=None)
     env = CustomWrapper(env, render=render)
-    # o1 = env.env.env.step([0, 0, 0, 0, 0, 0, 0])[0]
-    # o2 = env.env.env.env.latest_obs_dict
-    # o3 = env_robomimic
-    # print("\033[32m", o2, "\033[0m")
-    # print("\033[32m", o1, "\033[0m")
-
-    # from sys import exit; exit();
-    arm = "right"
-    config_name = "single-arm-opposed"
-    active_robot = env.robots[arm == "left"]  # 與你原來邏輯一致
 
     robosuite_cfg = {"MAX_EP_LEN": 300}
-    return env, active_robot, arm, config_name, robosuite_cfg
+    return env, robosuite_cfg
 
 
 def main(args):
     # ---- load expert policy ----
     # 這裡用你搬到比較短路徑的 expert model
     # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    expert_pol, _ = policy_from_checkpoint(
-        device=device,
-        ckpt_path=args.expert_policy_file,
-    )
-
-    recovery_policy, _ = policy_from_checkpoint(
-        device=device,
-        ckpt_path="models/model_epoch_1000.pth",
-    )
 
     render = not args.no_render
 
@@ -236,20 +140,13 @@ def main(args):
     )
 
     # ---- 建 env ----
-    # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
-    env_robomimic, _ = env_from_checkpoint(
-        ckpt_path=args.expert_policy_file, render=False
-    )
-
-    env, active_robot, arm_, config_, robosuite_cfg = create_env(
-        config, render, env_robomimic=env_robomimic, expert_pol=expert_pol
+    env, robosuite_cfg = create_env(
+        config, render
     )
 
     # ---- 決定 expert_pol ----
     if args.algo_sup:
         expert = HardcodedPolicy(env).act
-    else:
-        expert = expert_pol
 
     # ---- 如果要先收 offline data ----
     if args.gen_data:
@@ -268,7 +165,6 @@ def main(args):
     try:
         thrifty(
             env=env,
-            env_robomimic=env_robomimic,
             iters=args.iters,
             logger_kwargs=logger_kwargs,
             device_idx=args.device,
@@ -276,7 +172,6 @@ def main(args):
             seed=args.seed,
             expert_policy=expert,
             recovery_policy=expert,
-            extra_obs_extractor=get_observation,
             input_file=args.demonstration_set_file,
             robosuite=True,
             robosuite_cfg=robosuite_cfg,
