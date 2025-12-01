@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="change_max_expert_query_calulation_20251201T1030"
+EXP_NAME="add_nn_modulelist"
 SESSION_NAME="thriftydagger_$EXP_NAME"
 
 # 檢查 session 是否已存在
