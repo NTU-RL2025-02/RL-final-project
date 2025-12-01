@@ -25,7 +25,7 @@ python3 scripts/run_thriftydagger.py \
   --demonstration_set_file models/offline_dataset.pkl \
   --max_expert_query 2000 \
   --environment LunarLander-v3 \
-  -- no_render \
+  --no_render \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
 

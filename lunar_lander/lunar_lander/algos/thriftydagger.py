@@ -14,9 +14,9 @@ import numpy as np
 import torch
 from torch.optim import Adam
 
-import thrifty.algos.core as core
-from thrifty.utils.logx import EpochLogger
-from thrifty.algos.buffer import ReplayBuffer, QReplayBuffer
+import lunar_lander.algos.core as core
+from lunar_lander.utils.logx import EpochLogger
+from lunar_lander.algos.buffer import ReplayBuffer, QReplayBuffer
 
 
 # ----------------------------------------------------------------------

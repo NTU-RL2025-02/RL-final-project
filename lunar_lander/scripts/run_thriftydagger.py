@@ -19,7 +19,7 @@ from robosuite.wrappers import VisualizationWrapper
 from robosuite.wrappers import GymWrapper
 
 # thriftydagger
-from lunar_lander.algos.thriftydagger import thrifty, generate_offline_data
+from lunar_lander.algos.thriftydagger import thrifty
 from lunar_lander.utils.run_utils import setup_logger_kwargs
 
 import gymnasium as gym

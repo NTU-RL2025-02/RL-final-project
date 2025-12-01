@@ -1,12 +1,12 @@
 # From OpenAI Spinning Up
-from thrifty.user_config import (
+from lunar_lander.user_config import (
     DEFAULT_DATA_DIR,
     FORCE_DATESTAMP,
     DEFAULT_SHORTHAND,
     WAIT_BEFORE_LAUNCH,
 )
-from thrifty.utils.logx import colorize
-from thrifty.utils.serialization_utils import convert_json
+from lunar_lander.utils.logx import colorize
+from lunar_lander.utils.serialization_utils import convert_json
 import base64
 from copy import deepcopy
 import cloudpickle
