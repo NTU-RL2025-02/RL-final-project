@@ -246,11 +246,11 @@ def test_agent(
     obs, act, done, rew = [], [], [], []
 
     for episode_idx in range(num_test_episodes):
-        expert_policy.start_episode()
-        recovery_policy.start_episode()
+        # expert_policy.start_episode()
+        # recovery_policy.start_episode()
 
         ep_ret, ep_ret2, ep_len = 0.0, 0.0, 0
-        o_robomimic, terminated = env_robomimic.reset(), False
+        o, terminated = env.reset(), False
         o = get_observation_for_thrifty_dagger(env)
 
         while not terminated:
@@ -259,8 +259,7 @@ def test_agent(
             a = np.clip(a, -act_limit, act_limit)
             act.append(a)
 
-            o_robomimic, r, terminated, _ = env_robomimic.step(a)
-            o = get_observation_for_thrifty_dagger(env)
+            o, r, terminated, _ = env.step(a)
 
             if robosuite:
                 terminated = (ep_len + 1 >= horizon) or env._check_success()
@@ -345,8 +344,8 @@ def pretrain_policies(
 
             validation_losses: List[float] = []
             for sample_idx in range(len(held_out_data["obs"])):
-                print("    Valid Sample", sample_idx, flush=True)
-                print(len(held_out_data["obs"]), flush=True)
+                # print("    Valid Sample", sample_idx, flush=True)
+                # print(len(held_out_data["obs"]), flush=True)
                 a_pred = ac.act(held_out_data["obs"][sample_idx], i=net_idx)
                 a_sup = held_out_data["act"][sample_idx]
                 validation_losses.append(float(np.sum(a_pred - a_sup) ** 2))
@@ -824,11 +823,10 @@ def thrifty(
         estimates2: List[float] = []
 
         while step_count < obs_per_iter:
-            expert_policy.start_episode()
-            recovery_policy.start_episode()
+            # expert_policy.start_episode()
+            # recovery_policy.start_episode()
 
-            o_robomimic, done = env_robomimic.reset(), False
-            o = get_observation_for_thrifty_dagger(env)
+            o, done = env.reset(), False
 
             expert_mode = False
             safety_mode = False
@@ -877,13 +875,11 @@ def thrifty(
                         expert_mode = False
                         num_switch_to_robot += 1
 
-                        o_robomimic, _, done, _ = env_robomimic.step(
+                        o2, _, done, _ = env.step(
                             a_expert
                         )  # FIXME: Should this be a_robot? @Sheng-Yu-Cheng
-                        o2 = get_observation_for_thrifty_dagger(env)
                     else:
-                        o_robomimic, _, done, _ = env_robomimic.step(a_expert)
-                        o2 = get_observation_for_thrifty_dagger(env)
+                        o2, _, done, _ = env.step(a_expert)
 
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised (human / recovery)
@@ -907,13 +903,12 @@ def thrifty(
                         print("Switch to Robot")
                         safety_mode = False
                         num_switch_to_robot += 1
-                        o_robomimic, _, done, _ = env_robomimic.step(
+                        o2, _, done, _ = env.step(
                             a_recovery
                         )  # FIXME: Should this be a_robot? @Sheng-Yu-Cheng
                         o2 = get_observation_for_thrifty_dagger(env)
                     else:
-                        o_robomimic, _, done, _ = env_robomimic.step(a_recovery)
-                        o2 = get_observation_for_thrifty_dagger(env)
+                        o2, _, done, _ = env.step(a_recovery)
 
                     act.append(a_recovery)
                     sup.append(1)
@@ -947,8 +942,7 @@ def thrifty(
                 # --------------------------------------------------
                 else:
                     risk.append(float(ac.safety(o, a_robot)))
-                    o_robomimic, _, done, _ = env_robomimic.step(a_robot)
-                    o2 = get_observation_for_thrifty_dagger(env)
+                    o2, _, done, _ = env.step(a_robot)
 
                     act.append(a_robot)
                     sup.append(0)
