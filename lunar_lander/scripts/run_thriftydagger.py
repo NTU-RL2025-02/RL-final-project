@@ -26,20 +26,18 @@ import gymnasium as gym
 from stable_baselines3 import SAC
 
 
-def load_lunar_expert(model_path: str, device: str = "cpu"):
-    """
-    假設你的 expert 是 stable-baselines3 SAC
-    回傳一個 callable: expert(obs) -> action
-    """
-    model = SAC.load(model_path, device=device)
+class SB3Expert:
+    """Wrap a Stable-Baselines3 policy to match the expected expert API."""
 
-    def expert_policy(obs):
-        # thrifty 一般會用 numpy obs
-        # sb3 的 predict 會回傳 (action, state)
-        action, _ = model.predict(obs, deterministic=True)
-        return action
+    def __init__(self, model):
+        self.model = model
 
-    return expert_policy, model
+    def start_episode(self):
+        return
+
+    def __call__(self, obs):
+        action, _ = self.model.predict(obs, deterministic=True)
+        return np.asarray(action, dtype=np.float32)
 
 
 def main(args):
@@ -48,13 +46,10 @@ def main(args):
     # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    expert_pol, expert_model = load_lunar_expert(
-        model_path=args.expert_policy_file, device=device
-    )
-
-    recovery_policy, recovery_model = load_lunar_expert(
-        model_path=args.recovery_policy_file, device=device
-    )
+    expert_model = SAC.load(args.expert_policy_file, device=device)
+    expert_pol = SB3Expert(expert_model)
+    recovery_model = SAC.load(args.recovery_policy_file, device=device)
+    recovery_policy = SB3Expert(recovery_model)
 
     render = not args.no_render
 
