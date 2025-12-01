@@ -3,7 +3,7 @@
 # Usage: ./run.sh
 
 EXP_NAME="add_nn_modulelist"
-SESSION_NAME="thriftydagger_$EXP_NAME"
+SESSION_NAME="lunarlander_$EXP_NAME"
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -20,11 +20,11 @@ python3 scripts/run_thriftydagger.py \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \
-  --expert_policy_file models/model_epoch_1150_low_dim_v15_success_0.74.pth \
-  --recovery_policy_file models/model_epoch_1150_low_dim_v15_success_0.74.pth \
-  --demonstration_set_file models/model_epoch_1150_low_dim_v15_success_0.74-10000.pkl \
+  --expert_policy_file models/best_model.zip \
+  --recovery_policy_file models/best_model.zip \
+  --demonstration_set_file models/offline_dataset.pkl \
   --max_expert_query 2000 \
-  --environment SquareNutAssembly \
+  --environment LunarLander-v3 \
   -- no_render \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
