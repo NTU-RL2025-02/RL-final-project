@@ -847,7 +847,6 @@ def thrifty(
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
                 a_expert = expert_policy(o_robomimic)
                 a_recovery = recovery_policy(o_robomimic)
-                a_recovery = a_expert  # NOTE: 為了實驗目的，暫時使用 expert_policy 當作 suboptimal_policy
 
                 if not expert_mode:
                     # 只有在非 expert_mode 時才把 variance / safety 納入 estimates

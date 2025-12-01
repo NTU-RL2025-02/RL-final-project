@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="thrifty_1130-target_rate=0.01"
+EXP_NAME="change_max_expert_query_calulation_20251201T1030"
 SESSION_NAME="thriftydagger_$EXP_NAME"
 
 # 檢查 session 是否已存在
@@ -18,15 +18,22 @@ conda activate rl-final
 python3 scripts/run_thriftydagger.py \
   --seed 0 \
   --device 0 \
-  --iters 20 \
+  --iters 100 \
   --targetrate 0.01 \
-  --expert_policy_file models/model_epoch_2000_low_dim_v15_success_0.5.pth \
-  --recovery_policy_file models/model_epoch_1000.pth \
-  --demonstration_set_file models/model_epoch_2000_low_dim_v15_success_0.5-1000.pkl \
-  --max_expert_query 160000 \
+  --expert_policy_file models/model_epoch_2000_low_dim_v15_success_0.74.pth \
+  --recovery_policy_file models/model_epoch_2000_low_dim_v15_success_0.74.pth \
+  --demonstration_set_file models/model_epoch_2000_low_dim_v15_success_0.74-10000.pkl \
+  --max_expert_query 2000 \
   --environment SquareNutAssembly \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
 
 echo "Started tmux session: $SESSION_NAME"
 echo "Attach with: tmux attach -t $SESSION_NAME"
+
+# Experiment note:
+# max_expert_query 更改成 計算 切換到 expert + recovery policy 的次數
+# 更改 pth 和 pkl 為 成功率 0.74 的 model
+# Iter 改成 100
+# targetrate 為 0.01
+# Expected Result: 成功率至少 0.5 以上
