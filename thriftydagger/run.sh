@@ -20,9 +20,9 @@ python3 scripts/run_thriftydagger.py \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \
-  --expert_policy_file models/model_epoch_2000_low_dim_v15_success_0.74.pth \
-  --recovery_policy_file models/model_epoch_2000_low_dim_v15_success_0.74.pth \
-  --demonstration_set_file models/model_epoch_2000_low_dim_v15_success_0.74-10000.pkl \
+  --expert_policy_file models/model_epoch_1150_low_dim_v15_success_0.74.pth \
+  --recovery_policy_file models/model_epoch_1150_low_dim_v15_success_0.74.pth \
+  --demonstration_set_file models/model_epoch_1150_low_dim_v15_success_0.74-10000.pkl \
   --max_expert_query 2000 \
   --environment SquareNutAssembly \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
