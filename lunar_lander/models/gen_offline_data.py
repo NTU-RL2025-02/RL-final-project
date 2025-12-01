@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=Path,
-        default=root / "best_model.zip",
+        default=root / "./models/best_model.zip",
         help="Path to trained SAC model (.zip).",
     )
     parser.add_argument(
@@ -85,8 +85,8 @@ def collect_rollouts(
     min_return: Optional[float],
 ) -> Dict[str, np.ndarray]:
     data: Dict[str, List[np.ndarray]] = {
-        "observations": [],
-        "actions": [],
+        "obs": [],
+        "act": [],
         "next_observations": [],
         "rewards": [],
         "dones": [],
@@ -101,8 +101,8 @@ def collect_rollouts(
     for ep in range(episodes):
         obs, _ = env.reset(seed=base_seed + ep)
         ep_data: Dict[str, List[np.ndarray]] = {
-            "observations": [],
-            "actions": [],
+            "obs": [],
+            "act": [],
             "next_observations": [],
             "rewards": [],
             "dones": [],
@@ -117,8 +117,8 @@ def collect_rollouts(
             action, _ = model.predict(obs, deterministic=deterministic)
             next_obs, reward, done, truncated, _ = env.step(action)
 
-            ep_data["observations"].append(obs)
-            ep_data["actions"].append(action)
+            ep_data["obs"].append(obs)
+            ep_data["act"].append(action)
             ep_data["next_observations"].append(next_obs)
             ep_data["rewards"].append(reward)
             ep_data["dones"].append(done or truncated)
@@ -151,7 +151,7 @@ def collect_rollouts(
 
     if kept_lengths:
         print(
-            f"Collected {len(data['observations'])} transitions "
+            f"Collected {len(data['obs'])} transitions "
             f"({np.mean(kept_lengths):.1f}±{np.std(kept_lengths):.1f} steps/kept-episode)."
         )
         print(
