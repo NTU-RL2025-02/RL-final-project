@@ -156,7 +156,8 @@ def test_agent(
         recovery_policy.start_episode()
 
         ep_ret, ep_ret2, ep_len = 0.0, 0.0, 0
-        o, done = env.reset(), False
+        o, _ = env.reset()
+        done = False
 
         while not done:
             obs_list.append(o)
