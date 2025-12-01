@@ -747,6 +747,7 @@ def thrifty(
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
                 a_expert = expert_policy(o)
                 a_recovery = recovery_policy(o)
+                s_flag = False
 
                 if not expert_mode:
                     # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
@@ -763,7 +764,6 @@ def thrifty(
                     online_burden += 1
                     # safety critic 對 expert action 的評分
                     risk.append(float(ac.safety(o, a_expert)))
-                    s_flag = False
 
                     if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh and (
                         not q_learning or ac.safety(o, a_robot) > switch2robot_thresh2
@@ -783,9 +783,7 @@ def thrifty(
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised (human / recovery)
 
-                    qbuffer.store(
-                        o, a_expert, o2, int(s_flag), (ep_len + 1 >= horizon) or s_flag
-                    )
+                    qbuffer.store(o, a_expert, o2, int(s_flag), done)
 
                 # --------------------------------------------------
                 # safety_mode：由 recovery policy 控制
@@ -802,23 +800,22 @@ def thrifty(
                         safety_mode = False
                         num_switch_to_robot += 1
                         o2, r, terminated, truncated, _ = env.step(a_recovery)
-                        done = terminated or truncated
                         s_flag = r >= 200
+                        done = (
+                            terminated or truncated or s_flag or (ep_len + 1 >= horizon)
+                        )
+
                     else:
                         o2, r, terminated, truncated, _ = env.step(a_recovery)
-                        done = terminated or truncated
                         s_flag = r >= 200
+                        done = (
+                            terminated or truncated or s_flag or (ep_len + 1 >= horizon)
+                        )
 
                     act.append(a_recovery)
                     sup.append(1)
 
-                    qbuffer.store(
-                        o,
-                        a_expert,
-                        o2,
-                        int(s_flag),
-                        (ep_len + 1 >= horizon) or s_flag,
-                    )
+                    qbuffer.store(o, a_expert, o2, int(s_flag), done)
 
                 # --------------------------------------------------
                 # 檢查是否需要切到 human：novelty / risk
@@ -841,19 +838,16 @@ def thrifty(
                 else:
                     risk.append(float(ac.safety(o, a_robot)))
                     o2, r, terminated, truncated, _ = env.step(a_robot)
-                    done = terminated or truncated
                     s_flag = r >= 200
+                    done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_robot)
                     sup.append(0)
 
-                    qbuffer.store(
-                        o, a_robot, o2, int(s_flag), (ep_len + 1 >= horizon) or s_flag
-                    )
+                    qbuffer.store(o, a_robot, o2, int(s_flag), done)
 
-                done = (ep_len + 1 >= horizon) or env._check_success()
                 done_flags.append(done)
-                rew.append(int(env._check_success()))
+                rew.append(int(s_flag))
 
                 o = o2
                 obs.append(o)
