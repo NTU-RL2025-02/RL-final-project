@@ -21,7 +21,7 @@ python3 scripts/run_thriftydagger.py \
   --iters 100 \
   --targetrate 0.01 \
   --demonstration_set_file robosuite-30.pkl \
-  --max_expert_query 2000 \
+  --max_expert_query 160000 \
   --environment NutAssembly \
   --algo_sup \
   --no_render \
