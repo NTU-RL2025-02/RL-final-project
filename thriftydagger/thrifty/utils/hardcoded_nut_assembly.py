@@ -10,9 +10,9 @@ class HardcodedPolicy:
         self.last_turn = None  # whether we last turned CW or CCW
 
     def act(self, o):
-        obj_pos, obj_quat = o[:3], o[3:7]
-        rel_quat = o[10:14]
-        eef_pos, eef_quat = o[32+6:35+6], o[35+6:39+6]
+        obj_pos, obj_quat = o[7:10], o[10:14]
+        rel_quat = o[3:7]
+        eef_pos, eef_quat = o[38:41], o[41:45]
         a = np.zeros(7)
 
         pose = pose2mat((obj_pos, obj_quat))
@@ -43,7 +43,7 @@ class HardcodedPolicy:
             a[-1] = -1.0
             if self.last_turn:
                 a[5] = self.last_turn
-            elif abs(rel_quat[0] + 1) < abs(rel_quat[1] + 1):  # rotate CW
+            elif abs(rel_quat[0] + 1) > abs(rel_quat[1] + 1):  # rotate CW
                 a[5] = -0.3
                 self.last_turn = -0.3
             else:  # rotate CCW
