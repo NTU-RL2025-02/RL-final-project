@@ -843,6 +843,8 @@ def thrifty(
             while step_count < obs_per_iter and not done:
                 a_robot = ac.act(o)
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
+                a_expert = expert_policy(o)
+                a_recovery = recovery_policy(o)
 
                 if not expert_mode:
                     # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
