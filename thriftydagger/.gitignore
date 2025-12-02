@@ -13,3 +13,4 @@ plots/
 wandb/
 nohup.out
 output*.txt
+result.txt
