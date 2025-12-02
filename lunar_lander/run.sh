@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="add_nn_modulelist"
+EXP_NAME="exp1"
 SESSION_NAME="lunarlander_$EXP_NAME"
 
 # 檢查 session 是否已存在
@@ -16,7 +16,7 @@ source ~/.zshrc
 conda activate rl-final
 
 python3 scripts/run_thriftydagger.py \
-  --seed 42 \
+  --seed 365365365 \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \

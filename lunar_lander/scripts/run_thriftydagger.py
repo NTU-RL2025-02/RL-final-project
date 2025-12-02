@@ -56,22 +56,22 @@ def main(args):
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
 
     # ---- wandb ----
-    # wandb.init(
-    #     entity="aawrail-RL2025",
-    #     project="final_project_exp0",
-    #     name=args.exp_name,
-    #     config={
-    #         "seed": args.seed,
-    #         "device": args.device,
-    #         "iters": args.iters,
-    #         "target_rate": args.targetrate,
-    #         "environment": args.environment,
-    #         "max_expert_query": args.max_expert_query,
-    #         "expert_policy_file": args.expert_policy_file,
-    #         "recovery_policy_file": args.recovery_policy_file,
-    #         "demonstration_set_file": args.demonstration_set_file,
-    #     },
-    # )
+    wandb.init(
+        entity="aawrail-RL2025",
+        project="final_project_lunar_lander",
+        name=args.exp_name,
+        config={
+            "seed": args.seed,
+            "device": args.device,
+            "iters": args.iters,
+            "target_rate": args.targetrate,
+            "environment": args.environment,
+            "max_expert_query": args.max_expert_query,
+            "expert_policy_file": args.expert_policy_file,
+            "recovery_policy_file": args.recovery_policy_file,
+            "demonstration_set_file": args.demonstration_set_file,
+        },
+    )
 
     # ---- 建 env ----
     # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
@@ -106,12 +106,11 @@ def main(args):
             max_expert_query=args.max_expert_query,
         )
     except Exception:
-        # wandb.finish(exit_code=1)
+        wandb.finish(exit_code=1)
         raise
     else:
         # 正常跑完
-        # wandb.finish(exit_code=0)
-        pass
+        wandb.finish(exit_code=0)
     finally:
         env.close()
 
