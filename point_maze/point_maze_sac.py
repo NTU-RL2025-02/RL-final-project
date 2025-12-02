@@ -43,7 +43,7 @@ print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}")
 
 RL_TYPE = "SAC"
 ENV_ID = "PointMaze_UMaze-v3"  # choose any PointMaze variant you prefer
-LOG_DIR = os.path.join("logs", ENV_ID)
+LOG_DIR = os.path.join("./logs", ENV_ID)
 NAME_PREFIX = "point_maze_sac"
 
 # Training/evaluation kwargs keep rendering off for speed; video env enables RGB frames.
