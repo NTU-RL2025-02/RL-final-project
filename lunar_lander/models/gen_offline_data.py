@@ -24,7 +24,9 @@ from stable_baselines3 import SAC
 
 def parse_args() -> argparse.Namespace:
     root = Path(__file__).resolve().parents[1]
-    parser = argparse.ArgumentParser(description="Roll out SAC expert to build offline dataset.")
+    parser = argparse.ArgumentParser(
+        description="Roll out SAC expert to build offline dataset."
+    )
     parser.add_argument(
         "--model",
         type=Path,
@@ -40,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--episodes",
         type=int,
-        default=100,
+        default=10,
         help="Number of episodes to collect.",
     )
     parser.add_argument(
@@ -147,7 +149,9 @@ def collect_rollouts(
             data[k].extend(ep_data[k])
         kept_returns.append(ep_return)
         kept_lengths.append(ep_len)
-        print(f"Episode {ep + 1}/{episodes}: return={ep_return:.2f}, length={ep_len} (kept)")
+        print(
+            f"Episode {ep + 1}/{episodes}: return={ep_return:.2f}, length={ep_len} (kept)"
+        )
 
     if kept_lengths:
         print(

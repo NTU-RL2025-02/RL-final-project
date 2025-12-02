@@ -179,7 +179,6 @@ def test_agent(
             ep_len += 1
 
         print(f"episode #{episode_idx} success? {reward_list[-1]}")
-        env.close()
 
     print("Test Success Rate:", sum(reward_list) / num_test_episodes)
 
@@ -897,9 +896,6 @@ def thrifty(
                     "wb",
                 ),
             )
-
-            if robosuite:
-                env.close()
 
             # online 更新 switching thresholds
             if len(estimates) > threshold_cfg.min_estimates_for_update:
