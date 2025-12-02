@@ -9,6 +9,7 @@ import platform
 from importlib.metadata import version
 
 import gymnasium as gym
+import gymnasium_robotics
 import numpy as np
 import torch
 from gymnasium.wrappers import FlattenObservation
@@ -19,6 +20,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecVideoRecorder
 
 import matplotlib.pyplot as plt
+import tqdm
 
 
 def safe_version(pkg: str) -> str:
@@ -40,7 +42,7 @@ print(f"Numpy Version: {safe_version('numpy')}")
 print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}")
 
 RL_TYPE = "SAC"
-ENV_ID = "PointMaze_Medium-v3"  # choose any PointMaze variant you prefer
+ENV_ID = "PointMaze_UMaze-v3"  # choose any PointMaze variant you prefer
 LOG_DIR = os.path.join("logs", ENV_ID)
 NAME_PREFIX = "point_maze_sac"
 
