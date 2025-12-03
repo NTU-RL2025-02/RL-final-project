@@ -78,6 +78,7 @@ def main(args):
             "expert_policy_file": args.expert_policy_file,
             "recovery_policy_file": args.recovery_policy_file,
             "demonstration_set_file": args.demonstration_set_file,
+            "recovery_type": args.recovery_type,
         },
     )
 
@@ -127,6 +128,7 @@ def main(args):
             q_learning=True,
             init_model=args.eval,
             max_expert_query=args.max_expert_query,
+            recovery_type=args.recovery_type,
         )
     except Exception:
         wandb.finish(exit_code=1)
@@ -181,6 +183,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--environment", type=str, default="LunarLander-v3")
     parser.add_argument("--no_render", action="store_true")
+    parser.add_argument(
+        "--recovery_type",
+        type=str,
+        default="five_q",
+        choices=["five_q", "q"],
+        help="choose recovery policy variant",
+    )
     parser.add_argument(
         "--eval",
         type=str,

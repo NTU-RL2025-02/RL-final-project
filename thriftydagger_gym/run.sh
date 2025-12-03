@@ -3,6 +3,8 @@
 # Usage: ./run.sh
 
 EXP_NAME="exp1"
+# Recovery policy type: "five_q" (default) or "q"
+RECOVERY_TYPE="five_q"
 SESSION_NAME="lunarlander_$EXP_NAME"
 
 # 檢查 session 是否已存在
@@ -26,6 +28,7 @@ python3 scripts/run_thriftydagger.py \
   --max_expert_query 2000 \
   --environment LunarLander-v3 \
   --no_render \
+  --recovery_type $RECOVERY_TYPE \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
 
