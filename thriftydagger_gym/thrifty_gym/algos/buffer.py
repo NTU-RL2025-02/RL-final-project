@@ -2,7 +2,7 @@ import pickle
 import random
 import numpy as np
 import torch
-import lunar_lander.algos.core as core
+import thrifty_gym.algos.core as core
 
 
 class ReplayBuffer:

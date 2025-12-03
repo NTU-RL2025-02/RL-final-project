@@ -19,7 +19,7 @@ import warnings
 import wandb
 
 # from spinup.utils.mpi_tools import proc_id, mpi_statistics_scalar
-from lunar_lander.utils.serialization_utils import convert_json
+from thrifty_gym.utils.serialization_utils import convert_json
 
 color2num = dict(
     gray=30,

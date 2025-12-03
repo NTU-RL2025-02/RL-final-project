@@ -7,8 +7,8 @@ assert (
 ), "You should have Python 3.6 and greater."
 
 setup(
-    name="lunar_lander",
-    py_modules=["lunar_lander"],
+    name="thrifty_gym",
+    py_modules=["thrifty_gym"],
     version="0.0.1",
     install_requires=[
         "mujoco",
