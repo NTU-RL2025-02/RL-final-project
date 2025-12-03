@@ -21,7 +21,10 @@ from robosuite.wrappers import GymWrapper
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
 from thrifty_gym.utils.run_utils import setup_logger_kwargs
-from thrifty_gym.utils.wrapper import LunarLanderSuccessWrapper
+from thriftydagger_gym.thrifty_gym.utils.wrappers import (
+    LunarLanderSuccessWrapper,
+    MazeWrapper,
+)
 
 import gymnasium as gym
 import gymnasium_robotics
@@ -100,7 +103,7 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
         )
-        # TODO: 1. change maze 2. add success wrapper
+        env = MazeWrapper(env)  # add success wrapper
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
 

@@ -1,5 +1,12 @@
 from gymnasium import Wrapper
+
+
 class LunarLanderSuccessWrapper(Wrapper):
+    """
+    Wrapper to track success in LunarLander environment.
+    Success is defined as achieving an episode reward of at least 200.
+    """
+
     def __init__(self, env):
         super().__init__(env)
         self.success = False
@@ -9,7 +16,10 @@ class LunarLanderSuccessWrapper(Wrapper):
         obs, reward, terminated, truncated, info = super().step(action)
         done = terminated or truncated
         self.ep_reward += reward
+
+        # FIXME: I am not sure whether to put "and done" here
         self.success = (self.ep_reward >= 200.0) and done
+
         return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
@@ -27,8 +37,13 @@ class MazeWrapper(Wrapper):
         self.success = False
 
     def step(self, action):
-        # TODO: define success condition
-        return super().step(action)
+        obs, reward, terminated, truncated, info = super().step(action)
+        # FIXME: I am not sure whether to put "and done" here
+        self.success = reward > 0
+
+        # TODO: change observation?
+
+        return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
         self.success = False
