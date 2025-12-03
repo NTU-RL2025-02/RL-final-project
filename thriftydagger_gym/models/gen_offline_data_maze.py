@@ -4,10 +4,10 @@ Generate an offline dataset by rolling out a trained SAC policy on LunarLander.
 Usage (from thriftydagger_gym/models):
     python gen_offline_data.py \
         --episodes 100 \
-        --output lunar_lander_offline_dataset.pkl
+        --output offline_dataset.pkl
 
-The script defaults to loading `lunar_lander_best_model.zip` (trained with SAC)
-and the continuous control environment `LunarLanderContinuous-v2`.
+The script defaults to loading `best_model_medium.zip` (trained with SAC)
+and the continuous control environment `PointMaze_Medium-v3`.
 """
 
 from __future__ import annotations
@@ -15,12 +15,13 @@ from __future__ import annotations
 import argparse
 import pickle
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
 from stable_baselines3 import SAC
 import gymnasium_robotics
+from gymnasium.wrappers import FlattenObservation
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,7 +44,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--episodes",
         type=int,
-        default=10,
+        default=100,
         help="Number of episodes to collect.",
     )
     parser.add_argument(
@@ -72,10 +73,67 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min_return",
         type=float,
-        default=200,
+        default=1,
         help="If set, only keep episodes with total return >= this value.",
     )
     return parser.parse_args()
+
+
+def flatten_goal_observation(
+    obs: Union[np.ndarray, Dict[str, np.ndarray]],
+) -> np.ndarray:
+    """
+    Convert PointMaze's goal-aware dict observation into a flat numpy array.
+
+    The PointMaze env exposes three keys: ``observation`` (agent state),
+    ``achieved_goal`` (current goal state), and ``desired_goal`` (target state).
+    We concatenate them in a stable order so downstream learners that expect
+    vector inputs (e.g., the BC pretraining code) can consume the data.
+    """
+
+    if isinstance(obs, dict):
+        ordered_keys: Sequence[str] = ("observation", "achieved_goal", "desired_goal")
+        parts: List[np.ndarray] = []
+
+        for key in ordered_keys:
+            if key in obs:
+                parts.append(np.asarray(obs[key], dtype=np.float32).ravel())
+
+        # Include any extra keys (future-proofing) after the known ordering.
+        for key, value in obs.items():
+            if key not in ordered_keys:
+                parts.append(np.asarray(value, dtype=np.float32).ravel())
+
+        if not parts:
+            raise ValueError(
+                "Received a dict observation but found no entries to stack."
+            )
+
+        return np.concatenate(parts, axis=0).astype(np.float32, copy=False)
+
+    return np.asarray(obs, dtype=np.float32)
+
+
+def extract_success(info: Dict[str, Union[bool, np.ndarray]]) -> Optional[bool]:
+    """
+    Mirror eval_point_maze.py to interpret success flags from env infos.
+    Returns True/False when known keys exist, otherwise None.
+    """
+    candidate_keys: Tuple[str, ...] = (
+        "success",
+        "is_success",
+        "goal_achieved",
+        "goal_met",
+        "goal_reached",
+    )
+    for key in candidate_keys:
+        if key in info:
+            value = info[key]
+            try:
+                return bool(np.asarray(value).astype(bool).any())
+            except Exception:
+                return bool(value)
+    return None
 
 
 def collect_rollouts(
@@ -103,6 +161,7 @@ def collect_rollouts(
 
     for ep in range(episodes):
         obs, _ = env.reset(seed=base_seed + ep)
+        obs = flatten_goal_observation(obs)
         ep_data: Dict[str, List[np.ndarray]] = {
             "obs": [],
             "act": [],
@@ -113,18 +172,30 @@ def collect_rollouts(
         }
         ep_return = 0.0
         ep_len = 0
-        done = False
+        terminated = False
         truncated = False
 
-        while not (done or truncated):
+        while not (terminated or truncated):
             action, _ = model.predict(obs, deterministic=deterministic)
-            next_obs, reward, done, truncated, _ = env.step(action)
+            next_obs_raw, env_reward, terminated, truncated, info = env.step(action)
+            next_obs = flatten_goal_observation(next_obs_raw)
+
+            success_flag = extract_success(info)
+            if success_flag is None and terminated and not truncated:
+                success_flag = True
+            if success_flag:
+                terminated = True
+
+            reward = (
+                float(success_flag) if success_flag is not None else float(env_reward)
+            )
+            done_flag = terminated or truncated
 
             ep_data["obs"].append(obs)
             ep_data["act"].append(action)
             ep_data["next_observations"].append(next_obs)
             ep_data["rewards"].append(reward)
-            ep_data["dones"].append(done or truncated)
+            ep_data["dones"].append(done_flag)
             ep_data["episode_starts"].append(ep_len == 0)
 
             obs = next_obs
@@ -171,7 +242,14 @@ def collect_rollouts(
         f"All episodes average return: {np.mean(all_returns):.2f} ± {np.std(all_returns):.2f}"
     )
 
-    return {k: np.asarray(v) for k, v in data.items()}
+    return {
+        "obs": np.asarray(data["obs"], dtype=np.float32),
+        "act": np.asarray(data["act"], dtype=np.float32),
+        "next_observations": np.asarray(data["next_observations"], dtype=np.float32),
+        "rewards": np.asarray(data["rewards"], dtype=np.float32),
+        "dones": np.asarray(data["dones"], dtype=bool),
+        "episode_starts": np.asarray(data["episode_starts"], dtype=bool),
+    }
 
 
 def main() -> None:
@@ -180,7 +258,7 @@ def main() -> None:
     if not args.model.exists():
         raise FileNotFoundError(f"Model file not found: {args.model}")
 
-    env = gym.make(args.env_id)
+    env = FlattenObservation(gym.make(args.env_id))
     env.action_space.seed(args.seed)
 
     model: SAC = SAC.load(str(args.model))
