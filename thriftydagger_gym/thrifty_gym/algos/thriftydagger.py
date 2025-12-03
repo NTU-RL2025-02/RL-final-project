@@ -170,7 +170,7 @@ def test_agent(
             o, r, terminated, truncated, _ = env.step(a)
             ep_ret += r
 
-            success = ep_ret >= 200
+            success = env.is_success()
             done = terminated or truncated or success or (ep_len + 1 >= horizon)
 
             ep_ret2 += float(success)
@@ -754,12 +754,12 @@ def thrifty(
                         o2, r, terminated, truncated, _ = env.step(a_expert)
                         done = terminated or truncated
                         episode_reward += r
-                        s_flag = episode_reward >= 200
+                        s_flag = env.is_success()
                     else:
                         o2, r, terminated, truncated, _ = env.step(a_expert)
                         done = terminated or truncated
                         episode_reward += r
-                        s_flag = episode_reward >= 200
+                        s_flag = env.is_success()
 
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised (human / recovery)
@@ -782,7 +782,7 @@ def thrifty(
                         num_switch_to_robot += 1
                         o2, r, terminated, truncated, _ = env.step(a_recovery)
                         episode_reward += r
-                        s_flag = episode_reward >= 200
+                        s_flag = env.is_success()
                         done = (
                             terminated or truncated or s_flag or (ep_len + 1 >= horizon)
                         )
@@ -790,7 +790,7 @@ def thrifty(
                     else:
                         o2, r, terminated, truncated, _ = env.step(a_recovery)
                         episode_reward += r
-                        s_flag = episode_reward >= 200
+                        s_flag = env.is_success()
                         done = (
                             terminated or truncated or s_flag or (ep_len + 1 >= horizon)
                         )
@@ -822,7 +822,7 @@ def thrifty(
                     risk.append(float(ac.safety(o, a_robot)))
                     o2, r, terminated, truncated, _ = env.step(a_robot)
                     episode_reward += r
-                    s_flag = episode_reward >= 200
+                    s_flag = env.is_success()
                     done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_robot)
