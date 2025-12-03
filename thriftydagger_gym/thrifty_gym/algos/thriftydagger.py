@@ -134,8 +134,6 @@ def update_q(
 
 
 def test_agent(
-    expert_policy: Any,
-    recovery_policy: Any,
     env: Any,
     ac: Any,
     num_test_episodes: int,
@@ -144,16 +142,19 @@ def test_agent(
     robosuite: bool,
     logger_kwargs: Dict[str, Any],
     epoch: int = 0,
-) -> None:
+) -> float:
     """
     使用目前 policy `ac` 在環境中跑 `num_test_episodes` 回合（不做 intervention），
     並將 rollouts 存成 `test-rollouts.pkl` 以及 `output_dir/test{epoch}.pkl`。
+    Returns:
+        float: 平均成功率
     """
+    if num_test_episodes <= 0:
+        return
+
     obs_list, act_list, done_list, reward_list = [], [], [], []
 
     for episode_idx in range(num_test_episodes):
-        expert_policy.start_episode()
-        recovery_policy.start_episode()
 
         ep_ret, ep_ret2, ep_len = 0.0, 0.0, 0
         o, _ = env.reset()
@@ -178,10 +179,7 @@ def test_agent(
 
             ep_len += 1
 
-        print(f"episode #{episode_idx} success? {reward_list[-1]}")
-
-    print("Test Success Rate:", sum(reward_list) / num_test_episodes)
-
+    success_rate = sum(reward_list) / num_test_episodes
     data = {
         "obs": np.stack(obs_list),
         "act": np.stack(act_list),
@@ -194,6 +192,8 @@ def test_agent(
         data,
         open(os.path.join(logger_kwargs["output_dir"], f"test{epoch}.pkl"), "wb"),
     )
+
+    return success_rate
 
 
 # ----------------------------------------------------------------------
@@ -390,24 +390,6 @@ def retrain_qrisk(
     if not q_learning:
         return None
 
-    # 用目前 policy 收集離線資料（optional）
-    if num_test_episodes > 0:
-        test_agent(
-            expert_policy,
-            recovery_policy,
-            env,
-            ac,
-            num_test_episodes,
-            act_limit,
-            horizon,
-            robosuite,
-            logger_kwargs,
-            epoch=epoch_idx,
-        )
-        data = pickle.load(open("test-rollouts.pkl", "rb"))
-        qbuffer.fill_buffer(data)
-        os.remove("test-rollouts.pkl")
-
     # 重新設定 Q-network optimizer
     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
     q_optimizer = Adam(q_params, lr=pi_lr)
@@ -432,7 +414,7 @@ def log_epoch(
     logger: EpochLogger,
     epoch_idx: int,
     ep_num: int,
-    fail_ct: int,
+    success_rate: int,
     total_env_interacts: int,
     online_burden: int,
     num_switch_to_human: int,
@@ -458,27 +440,24 @@ def log_epoch(
         print("LossQ", avg_loss_q)
 
     print("TotalEpisodes", ep_num)
-    print("TotalSuccesses", ep_num - fail_ct)
     print("TotalEnvInteracts", total_env_interacts)
+    print("SuccessRate", success_rate)
     print("OnlineBurden", online_burden)
     print("NumSwitchToNov", num_switch_to_human)
     print("NumSwitchToRisk", num_switch_to_recovery)
     print("NumSwitchBack", num_switch_to_robot)
-
-    success_rate = (ep_num - fail_ct) / ep_num if ep_num > 0 else 0.0
 
     logger.log_tabular("Epoch", epoch_idx)
     logger.log_tabular("LossPi", avg_loss_pi)
     if q_learning:
         logger.log_tabular("LossQ", avg_loss_q)
     logger.log_tabular("TotalEpisodes", ep_num)
-    logger.log_tabular("TotalSuccesses", ep_num - fail_ct)
-    logger.log_tabular("SuccessRate", success_rate)
     logger.log_tabular("TotalEnvInteracts", total_env_interacts)
-    logger.log_tabular("OnlineBurden", online_burden)
+    logger.log_tabular("SuccessRate", success_rate)
     logger.log_tabular("NumSwitchToNov", num_switch_to_human)
     logger.log_tabular("NumSwitchToRisk", num_switch_to_recovery)
     logger.log_tabular("NumSwitchBack", num_switch_to_robot)
+    logger.log_tabular("OnlineBurden", online_burden)
 
     logger.dump_tabular()
 
@@ -510,7 +489,7 @@ def thrifty(
     target_rate: float = 0.01,
     robosuite: bool = False,
     gym_cfg: Optional[Dict[str, Any]] = None,
-    q_learning: bool = False,
+    q_learning: bool = True,
     gamma: float = 0.9999,
     init_model: Optional[str] = None,
     max_expert_query: int = 2000,
@@ -644,9 +623,7 @@ def thrifty(
     # 7. 純 evaluation 模式（iters=0 且有設定 test episodes）
     # ----------------------------------------------------------
     if iters == 0 and num_test_episodes > 0:
-        test_agent(
-            expert_policy,
-            recovery_policy,
+        success_rate = test_agent(
             env,
             ac,
             num_test_episodes,
@@ -656,6 +633,7 @@ def thrifty(
             logger_kwargs,
             epoch=0,
         )
+        print("Final Success Rate:", success_rate)
         sys.exit(0)
 
     # ----------------------------------------------------------
@@ -868,8 +846,6 @@ def thrifty(
 
             if done:
                 ep_num += 1
-            if ep_len >= horizon:
-                fail_ct += 1
 
             total_env_interacts += ep_len
 
@@ -914,7 +890,7 @@ def thrifty(
                 )
 
         # --------------------------------------------------
-        # 10-2. retrain policy / Q-risk
+        # 10-2. retrain policy
         # --------------------------------------------------
         ac_new, pi_optimizers, avg_loss_pi = retrain_policy(
             actor_critic,
@@ -935,49 +911,74 @@ def thrifty(
         if ac_new is not None:
             ac = ac_new
 
-        avg_loss_q = retrain_qrisk(
-            ac,
-            ac_targ,
-            qbuffer,
-            q_learning,
-            num_test_episodes,
-            expert_policy,
-            recovery_policy,
+        # --------------------------------------------------
+        # 10-2. Evaluate current policy
+        # --------------------------------------------------
+
+        success_rate = test_agent(
             env,
+            ac,
+            num_test_episodes,
             act_limit,
             horizon,
             robosuite,
             logger_kwargs,
-            pi_lr,
-            bc_epochs,
-            grad_steps,
-            gamma,
-            batch_size,
-            qrisk_cfg,
-            epoch_idx,
+            epoch=epoch_idx,
         )
+        print("Epoch {}: Success Rate {:.3f}".format(epoch_idx, success_rate))
 
         # --------------------------------------------------
-        # 10-3. end-of-epoch logging
+        # 10-3. retrain Q-risk safety critic
+        # --------------------------------------------------
+
+        if q_learning:
+            data = pickle.load(open("test-rollouts.pkl", "rb"))
+            qbuffer.fill_buffer(data)
+            os.remove("test-rollouts.pkl")
+
+            avg_loss_q = retrain_qrisk(
+                ac,
+                ac_targ,
+                qbuffer,
+                q_learning,
+                num_test_episodes,
+                expert_policy,
+                recovery_policy,
+                env,
+                act_limit,
+                horizon,
+                robosuite,
+                logger_kwargs,
+                pi_lr,
+                bc_epochs,
+                grad_steps,
+                gamma,
+                batch_size,
+                qrisk_cfg,
+                epoch_idx,
+            )
+
+        # --------------------------------------------------
+        # 10-4. end-of-epoch logging
         # --------------------------------------------------
         logger.save_state(dict())
         log_epoch(
-            logger,
-            epoch_idx,
-            ep_num,
-            fail_ct,
-            total_env_interacts,
-            online_burden,
-            num_switch_to_human,
-            num_switch_to_recovery,
-            num_switch_to_robot,
-            avg_loss_pi,
-            avg_loss_q,
-            q_learning,
+            logger=logger,
+            epoch_idx=epoch_idx,
+            ep_num=ep_num,
+            success_rate=success_rate,
+            total_env_interacts=total_env_interacts,
+            online_burden=online_burden,
+            num_switch_to_human=num_switch_to_human,
+            num_switch_to_recovery=num_switch_to_recovery,
+            num_switch_to_robot=num_switch_to_robot,
+            loss_pi=avg_loss_pi,
+            loss_q=avg_loss_q if q_learning else None,
+            q_learning=q_learning,
         )
 
         # --------------------------------------------------
-        # 10-4. 早停條件：supervisor label 達上限
+        # 10-5. 早停條件：supervisor label 達上限
         # --------------------------------------------------
         if num_switch_to_human + num_switch_to_recovery >= max_expert_query:
             print("Reached max expert queries, stopping training.")
