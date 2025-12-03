@@ -26,8 +26,8 @@ class LunarLanderSuccessWrapper(Wrapper):
 
 class MazeWrapper(Wrapper):
     def __init__(self, env):
-        self.success = False
         super().__init__(env)
+        self.success = False
 
     def step(self, action):
         # TODO: define success condition
