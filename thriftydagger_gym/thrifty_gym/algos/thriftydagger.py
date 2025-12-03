@@ -12,11 +12,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.optim import Adam
 
 import thrifty_gym.algos.core as core
 from thrifty_gym.utils.logx import EpochLogger
 from thrifty_gym.algos.buffer import ReplayBuffer, QReplayBuffer
+from thrifty_gym.algos.recovery import QRecovery, FiveQRecovery
 
 
 # ----------------------------------------------------------------------
@@ -493,6 +495,8 @@ def thrifty(
     gamma: float = 0.9999,
     init_model: Optional[str] = None,
     max_expert_query: int = 2000,
+    recovery_type: str = "five_q",
+    recovery_kwargs: Dict[str, Any] = dict(),
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -668,6 +672,32 @@ def thrifty(
     switch2human_thresh2 = threshold_cfg.init_eps_H
     switch2robot_thresh2 = threshold_cfg.init_eps_R
 
+    # ----------------------------------------------------------
+    # 9-1. 初始化 Recovery Policy
+    # ----------------------------------------------------------
+    if recovery_type.lower() == "q":
+        recovery_policy = QRecovery(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            hidden_sizes=ac_kwargs.get("hidden_sizes", (256, 256)),
+            activation=ac_kwargs.get("activation", nn.ReLU),
+            q_risk = ac.safety,
+        )
+        print("Using QRecovery (single Q-network)")
+    elif recovery_type.lower() == "five_q":
+        recovery_policy = FiveQRecovery(
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+            hidden_sizes=ac_kwargs.get("hidden_sizes", (256, 256)),
+            activation=ac_kwargs.get("activation", nn.ReLU),
+            num_nets=recovery_kwargs.get("num_nets", num_nets),
+            variance_weight=recovery_kwargs.get("variance_weight", 1.0),
+            q_risk = ac.safety,
+        )
+        print(f"Using FiveQRecovery (5 Q-networks, variance_weight={recovery_kwargs.get('variance_weight', 1.0)})")
+    else:
+        raise ValueError(f"Unknown recovery_type: {recovery_type}")
+
     torch.cuda.empty_cache()
     replay_buffer.fill_buffer(held_out_data["obs"], held_out_data["act"])
 
@@ -725,7 +755,13 @@ def thrifty(
                 a_robot = ac.act(o)
                 a_robot = np.clip(a_robot, -act_limit, act_limit)
                 a_expert = expert_policy(o)
-                a_recovery = recovery_policy(o)
+                a_recovery = recovery_policy.run(
+                    o,
+                    a_robot,
+                    steps=recovery_kwargs.get("steps", 20),
+                    lr=recovery_kwargs.get("lr", 0.01),
+                    action_bounds=(-act_limit, act_limit),
+                )
                 s_flag = False
 
                 if not expert_mode:
@@ -770,6 +806,7 @@ def thrifty(
                 # safety_mode：由 recovery policy 控制
                 # --------------------------------------------------
                 elif safety_mode:
+                    a_recovery = recovery_policy.run(o, a_robot)
                     a_recovery = np.clip(a_recovery, -act_limit, act_limit)
                     replay_buffer.store(o, a_recovery)
                     risk.append(float(ac.safety(o, a_recovery)))
@@ -798,7 +835,7 @@ def thrifty(
                     act.append(a_recovery)
                     sup.append(1)
 
-                    qbuffer.store(o, a_expert, o2, int(s_flag), done)
+                    qbuffer.store(o, a_recovery, o2, int(s_flag), done)
 
                 # --------------------------------------------------
                 # 檢查是否需要切到 human：novelty / risk

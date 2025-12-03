@@ -34,22 +34,29 @@ class Recovery:
         variance_weight: lambda 參數，用來平衡 mean_Q 和 var_Q
                         較大的值表示更重視減小 variance
         """
-        obs_dim = observation_space.shape[0]
-        act_dim = action_space.shape[0]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.num_nets = num_nets
         self.alpha = 0.9  # for accumulate_risk
         self.eta = 0.5    # threshold for risk indicator
-        self.q_networks = [
-            MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
-            for _ in range(num_nets)
-        ]
+        self.R_t = 0.0    # initial risk score for AccumulateRisk
+
         self.q_risk = q_risk
         self.variance_weight = variance_weight
-        self.R_t = 0.0  # initial risk score for AccumulateRisk
+        self.q_networks = []
 
+        if observation_space is not None and action_space is not None and num_nets > 0:
+            obs_dim = observation_space.shape[0]
+            act_dim = action_space.shape[0]
+            self.q_networks = [
+                MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
+                for _ in range(num_nets)
+            ]
+    
     def objective(self, obs, action):
         raise NotImplementedError
+
+    def start_episode(self):
+        """讓 thrifty() 可以在每個 episode 開頭 reset 狀態。"""
+        self.R_t = 0.0
 
     def gradient_ascent(
         self, obs, init_action, steps=20, lr=0.01, action_bounds=(-1.0, 1.0)
@@ -116,22 +123,26 @@ class Recovery:
 
 
 class QRecovery(Recovery):
-    def __init__(self,
+    def __init__(
+        self,
         observation_space,
         action_space,
         hidden_sizes=(256, 256),
         activation=nn.ReLU,
+        q_risk=None,
     ):
-        super().__init__(action_space)
-        obs_dim = observation_space.shape[0]
-        act_dim = action_space.shape[0]
-
-        self.q_networks = [
-            MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
-        ]
+        super().__init__(
+            q_risk=q_risk,
+            observation_space=observation_space,
+            action_space=action_space,
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+            num_nets=1,         # 單一 Q-network
+            variance_weight=1.0,
+        )
 
     def objective(self, obs, action):
-        # 直接最大化Q value
+        # 直接最大化 Q value
         return self.q_networks[0](obs, action).view(-1)[0]
     
     def run(self, obs, init_action, steps=20, lr=0.01, action_bounds=(-1.0, 1.0)):
@@ -148,21 +159,22 @@ class FiveQRecovery(Recovery):
         activation=nn.ReLU,
         num_nets=5,
         variance_weight=1.0,
+        q_risk=None,
     ):
-        super().__init__(num_nets=num_nets, variance_weight=variance_weight)
-        obs_dim = observation_space.shape[0]
-        act_dim = action_space.shape[0]
+        super().__init__(
+            q_risk=q_risk,
+            observation_space=observation_space,
+            action_space=action_space,
+            hidden_sizes=hidden_sizes,
+            activation=activation,
+            num_nets=num_nets,
+            variance_weight=variance_weight,
+        )
 
-        self.variance_weight = variance_weight
-        self.q_networks = [
-            MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
-            for _ in range(num_nets)
-        ]
-    
     def objective(self, obs, action):
         """
         f(a) = mean_Q(a) - lambda * var_Q(a)
-        這裡才用到 5 個 Q + variance。
+        這裡用到5個Q functions
         """
         q_vals = [q(obs, action).view(-1)[0] for q in self.q_networks]
         q_stack = torch.stack(q_vals)  # (num_q,)
