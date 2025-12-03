@@ -483,28 +483,10 @@ def retrain_qrisk(
     若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
     否則回傳 None。
     """
+
     if not q_learning:
         return None
-
-    # 用目前 policy 收集離線資料（optional）
-    if num_test_episodes > 0:
-        test_agent(
-            expert_policy,
-            recovery_policy,
-            env,
-            env_robomimic,
-            ac,
-            num_test_episodes,
-            act_limit,
-            horizon,
-            robosuite,
-            logger_kwargs,
-            epoch=epoch_idx,
-        )
-        data = pickle.load(open("test-rollouts.pkl", "rb"))
-        qbuffer.fill_buffer(data)
-        os.remove("test-rollouts.pkl")
-
+    
     # 重新設定 Q-network optimizer
     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
     q_optimizer = Adam(q_params, lr=pi_lr)
@@ -1039,6 +1021,25 @@ def thrifty(
         if ac_new is not None:
             ac = ac_new
 
+        # 用目前 policy 收集離線資料（optional）
+        if q_learning and num_test_episodes > 0:
+            test_agent(
+                expert_policy,
+                recovery_policy,
+                env,
+                env_robomimic,
+                ac,
+                num_test_episodes,
+                act_limit,
+                horizon,
+                robosuite,
+                logger_kwargs,
+                epoch=epoch_idx,
+            )
+            data = pickle.load(open("test-rollouts.pkl", "rb"))
+            qbuffer.fill_buffer(data)
+            os.remove("test-rollouts.pkl")
+            
         avg_loss_q = retrain_qrisk(
             ac,
             ac_targ,
