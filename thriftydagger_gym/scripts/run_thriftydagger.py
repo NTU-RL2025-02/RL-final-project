@@ -4,7 +4,8 @@
 # --------------------------------------------------------------
 # Imports
 # --------------------------------------------------------------
-
+import os
+os.environ["MUJOCO_GL"] = "egl"
 # standard libraries
 import numpy as np
 import sys
@@ -101,6 +102,14 @@ def main(args):
             render_mode="human" if render else None,
         )
         env = MazeWrapper(env)  # add success wrapper
+    elif args.environment == "PointMaze_Medium-v3":
+        env = gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
+        )
+        env = MazeWrapper(env)  # add success wrapper
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
 
@@ -169,14 +178,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--expert_policy_file",
         type=str,
-        default="models/best_model.zip",
+        default="models/best_model_medium",
         help="filepath to expert model zip file",
     )
 
     parser.add_argument(
         "--recovery_policy_file",
         type=str,
-        default="models/best_model.zip",
+        default="models/best_model_medium",
         help="filepath to recovery model zip file",
     )
 
@@ -193,7 +202,7 @@ if __name__ == "__main__":
         default=2000,
         help="maximum number of expert queries allowed",
     )
-    parser.add_argument("--environment", type=str, default="LunarLander-v3")
+    parser.add_argument("--environment", type=str, default="PointMaze_Medium-v3")
     parser.add_argument("--no_render", action="store_true")
     parser.add_argument(
         "--recovery_type",
