@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import torch.nn as nn
+from core import MLPQFunction
 
 class Recovery():
     """
@@ -11,7 +13,18 @@ class Recovery():
     q_networks: list of callables, each taking (obs, act) and returning scalar Q(s,a)
     risk_q:     callable for Q_risk(s,a), can be one of the q_networks or a separate net
     """
-    def __init__(self, q_networks, q_risk, alpha=0.9, eta=0.5, device = 'cuda' if torch.cuda.is_available() else 'cpu'):
+    def __init__(
+            self, 
+            q_risk, 
+            observation_space,
+            action_space,
+            device = 'cuda' if torch.cuda.is_available() else 'cpu',
+            hidden_sizes=(256, 256),
+            activation=nn.ReLU,
+            num_nets=5,
+            alpha=0.9, 
+            eta=0.5
+        ):
         """
         Parameters:
         q_networks: list of callables, each taking (obs, act) and returning scalar Q(s,a)
@@ -19,7 +32,13 @@ class Recovery():
         q_risk: for accumuate_risk
         alpha: R_t = alpha * R_{t-1} + (1-alpha) * indicator(用到eta當threshold)
         """
-        self.q_networks = q_networks
+        obs_dim = observation_space.shape[0]
+        act_dim = action_space.shape[0]
+        self.num_nets = num_nets
+        self.q_networks = [
+            MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(device)
+            for _ in range(num_nets)
+        ]
         self.alpha = alpha
         self.q_risk = q_risk
         self.eta = eta
