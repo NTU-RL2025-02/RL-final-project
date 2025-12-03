@@ -187,10 +187,14 @@ class Ensemble(nn.Module):
         self.num_nets = num_nets
         self.device = device
         # build policy and value functions
-        self.pis = nn.ModuleList([
-            MLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit).to(device)
-            for _ in range(num_nets)
-        ])
+        self.pis = nn.ModuleList(
+            [
+                MLPActor(obs_dim, act_dim, hidden_sizes, activation, act_limit).to(
+                    device
+                )
+                for _ in range(num_nets)
+            ]
+        )
         self.q1 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(device)
         self.q2 = MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(device)
 
@@ -230,7 +234,9 @@ class EnsembleCNN(nn.Module):
         self.num_nets = num_nets
         self.device = device
         # build policy and value functions
-        self.pis = nn.ModuleList([CNNActor(obs_dim, act_dim).to(device) for _ in range(num_nets)])
+        self.pis = nn.ModuleList(
+            [CNNActor(obs_dim, act_dim).to(device) for _ in range(num_nets)]
+        )
         self.q1 = CNNQFunction(obs_dim, act_dim).to(device)
         self.q2 = CNNQFunction(obs_dim, act_dim).to(device)
 

@@ -36,7 +36,8 @@ print(f"Python Version: {platform.python_version()}")
 print(f"Torch Version: {version('torch')}")
 print(f"Is Cuda Available: {torch.cuda.is_available()}")
 print(f"Cuda Version: {torch.version.cuda}")
-if torch.cuda.is_available(): print(f"GPU Device: {torch.cuda.get_device_name(0)}")
+if torch.cuda.is_available():
+    print(f"GPU Device: {torch.cuda.get_device_name(0)}")
 print(f"Gymnasium Version: {version('gymnasium')}")
 print(f"Numpy Version: {version('numpy')}")
 print(f"Scipy Version: {version('scipy')}")
@@ -71,27 +72,23 @@ eval_callback = EvalCallback(
     eval_freq=eval_freq,
     render=False,
     deterministic=True,
-    n_eval_episodes=20)
+    n_eval_episodes=20,
+)
 
 checkpoint_callback = CheckpointCallback(
-    save_freq=eval_freq,
-    save_path=os.path.join(log_dir, "checkpoint")
+    save_freq=eval_freq, save_path=os.path.join(log_dir, "checkpoint")
 )
 
 # Create the callback list
-callbackList = CallbackList([checkpoint_callback,
-                             eval_callback])
+callbackList = CallbackList([checkpoint_callback, eval_callback])
 
 # Initialize SAC
-model = SAC('MlpPolicy',
-            env,
-            verbose=0,
-            tensorboard_log=os.path.join(log_dir, "tensorboard"))
+model = SAC(
+    "MlpPolicy", env, verbose=0, tensorboard_log=os.path.join(log_dir, "tensorboard")
+)
 
 # Train the model
-model.learn(total_timesteps=750_000,
-            progress_bar=True,
-            callback=callbackList)
+model.learn(total_timesteps=750_000, progress_bar=True, callback=callbackList)
 
 # Save the model
 model.save(os.path.join(log_dir, "final_model"))
@@ -113,11 +110,13 @@ print(f"Best Model - Mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
 
 # Record video of the best model playing Lunar Lander
 best_model_file_name = "best_model_{}".format(name_prefix)
-env = VecVideoRecorder(env,
-                       log_dir,
-                       video_length=5_000,
-                       record_video_trigger=lambda x: x == 0,
-                       name_prefix=best_model_file_name)
+env = VecVideoRecorder(
+    env,
+    log_dir,
+    video_length=5_000,
+    record_video_trigger=lambda x: x == 0,
+    name_prefix=best_model_file_name,
+)
 
 obs = env.reset()
 for _ in range(5_000):
@@ -143,13 +142,11 @@ std_results = numpy.std(results, axis=1)
 # Plot the results
 matplotlib.pyplot.figure()
 matplotlib.pyplot.plot(timesteps, mean_results)
-matplotlib.pyplot.fill_between(timesteps,
-                               mean_results - std_results,
-                               mean_results + std_results,
-                               alpha=0.3)
+matplotlib.pyplot.fill_between(
+    timesteps, mean_results - std_results, mean_results + std_results, alpha=0.3
+)
 
 matplotlib.pyplot.xlabel("Timesteps")
 matplotlib.pyplot.ylabel("Mean Reward")
 matplotlib.pyplot.title(f"{rl_type} Performance on {env_str}")
 matplotlib.pyplot.show()
-
