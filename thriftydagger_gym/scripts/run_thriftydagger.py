@@ -102,7 +102,7 @@ def main(args):
         )
         # TODO: 1. change maze 2. add success wrapper
     else:
-        raise NotImplementedError("This environment is implemented in this script.")
+        raise NotImplementedError("This environment is not implemented in this script.")
 
     max_ep_len = getattr(env, "_max_episode_steps", 1000)
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
