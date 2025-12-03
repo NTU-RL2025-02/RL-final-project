@@ -1,12 +1,12 @@
 """
 Generate an offline dataset by rolling out a trained SAC policy on LunarLander.
 
-Usage (from repository root):
-    python lunar_lander/scripts/gen_offline_data.py \
+Usage (from thriftydagger_gym/models):
+    python gen_offline_data.py \
         --episodes 100 \
-        --output lunar_lander/offline_dataset.pkl
+        --output lunar_lander_offline_dataset.pkl
 
-The script defaults to loading `lunar_lander/best_model.zip` (trained with SAC)
+The script defaults to loading `lunar_lander_best_model.zip` (trained with SAC)
 and the continuous control environment `LunarLanderContinuous-v2`.
 """
 
