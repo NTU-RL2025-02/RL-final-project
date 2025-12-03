@@ -38,6 +38,7 @@ setup(
         "swig",
         "gymnasium[Box2D]",
         "stable-baselines3",
+        "gymnasium_robotics",
     ],
     description="Code for ThriftyDAgger. Modified for Lunar Lander environment.",
     author="Ryan Hoque",

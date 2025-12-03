@@ -21,8 +21,12 @@ from robosuite.wrappers import GymWrapper
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
 from thrifty_gym.utils.run_utils import setup_logger_kwargs
+from thrifty_gym.utils.wrapper import LunarLanderSuccessWrapper
 
 import gymnasium as gym
+import gymnasium_robotics
+from gymnasium_robotics.envs.maze.maps import U_MAZE
+
 from stable_baselines3 import SAC
 
 
@@ -54,6 +58,7 @@ def main(args):
     render = not args.no_render
 
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+    gym.register_envs(gymnasium_robotics)
 
     # ---- wandb ----
     wandb.init(
@@ -74,16 +79,31 @@ def main(args):
     )
 
     # ---- 建 env ----
-    # 假設你的 robomimic expert_pol 是在上面某處初始化好的；如果沒有，就先設成 None
-    env = gym.make(
-        "LunarLander-v3",
-        continuous=True,
-        gravity=-3.0,
-        enable_wind=True,
-        wind_power=18.0,
-        turbulence_power=1.5,
-        render_mode="human" if render else None,
-    )
+    env = None
+    if args.environment == "LunarLander-v3":
+        env = gym.make(
+            "LunarLander-v3",
+            continuous=True,
+            gravity=-3.0,
+            enable_wind=True,
+            wind_power=18.0,
+            turbulence_power=1.5,
+            render_mode="human" if render else None,
+        )
+        env = LunarLanderSuccessWrapper(env)  # add success wrapper
+
+    elif args.environment == "PointMaze_UMazeDense-v3":
+        env = gym.make(
+            "PointMaze_UMazeDense-v3",
+            maze_map=U_MAZE,
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
+        )
+        # TODO: 1. change maze 2. add success wrapper
+    else:
+        raise NotImplementedError("This environment is not implemented in this script.")
+
     max_ep_len = getattr(env, "_max_episode_steps", 1000)
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
