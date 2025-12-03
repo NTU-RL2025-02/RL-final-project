@@ -21,7 +21,7 @@ from robosuite.wrappers import GymWrapper
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
 from thrifty_gym.utils.run_utils import setup_logger_kwargs
-from thrifty_gym.utils.wrappers import LunarLanderSuccessWrapper
+from thrifty_gym.utils.wrapper import LunarLanderSuccessWrapper
 
 import gymnasium as gym
 import gymnasium_robotics
