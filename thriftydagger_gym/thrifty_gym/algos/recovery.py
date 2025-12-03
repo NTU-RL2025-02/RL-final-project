@@ -114,10 +114,6 @@ class Recovery:
         self.R_t = self.alpha * self.R_t + (1 - self.alpha) * indicator
         return self.R_t
 
-    def choose_action(self, obs, init_action):
-        # FIXME: 我的初步想法？應該是這樣，但不太確定是不是這樣子就好
-        return self.gradient_ascent(obs, init_action)
-
 
 class QRecovery(Recovery):
     def __init__(self,
@@ -133,9 +129,14 @@ class QRecovery(Recovery):
         self.q_networks = [
             MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
         ]
+
     def objective(self, obs, action):
         # 直接最大化Q value
         return self.q_networks[0](obs, action).view(-1)[0]
+    
+    def run(self, obs, init_action, steps=20, lr=0.01, action_bounds=(-1.0, 1.0)):
+        # return an action
+        return self.gradient_ascent(obs, init_action, steps, lr, action_bounds)
 
 
 class FiveQRecovery(Recovery):
@@ -157,28 +158,6 @@ class FiveQRecovery(Recovery):
             MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
             for _ in range(num_nets)
         ]
-
-    def five_q_networks(self, obs, act):
-        """
-        評估給定的 observation 和 action 在5個Q networks上的表現
-        
-        Returns:
-        --------
-        mean_q: 5個Q values的平均值
-        var_q: 5個Q values的variance
-        q_values: 5個Q values的list
-        """
-        o = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)
-        a = torch.as_tensor(act, dtype=torch.float32).unsqueeze(0).to(self.device)
-        q_values = []
-        for q_net in self.q_networks:
-            with torch.no_grad():
-                q_val = q_net(o, a).item()  # get scalar value
-                q_values.append(q_val)
-        q_values = np.asarray(q_values, dtype=np.float32)
-        mean_q = float(np.mean(q_values))
-        var_q = float(np.var(q_values))
-        return mean_q, var_q, q_values
     
     def objective(self, obs, action):
         """
@@ -191,7 +170,9 @@ class FiveQRecovery(Recovery):
         var_q = q_stack.var(unbiased=False)
         return mean_q - self.variance_weight * var_q
     
-
+    def run(self, obs, init_action, steps=20, lr=0.01, action_bounds=(-1.0, 1.0)):
+        # return an action
+        return self.gradient_ascent(obs, init_action, steps, lr, action_bounds)
 
     """
     使用5個Q networks來計算mean和variance，並通過gradient ascent優化組合目標函數：
