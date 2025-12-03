@@ -203,7 +203,19 @@ if __name__ == "__main__":
         help="maximum number of expert queries allowed",
     )
     parser.add_argument("--environment", type=str, default="PointMaze_Medium-v3")
-    parser.add_argument("--no_render", action="store_true")
+    parser.add_argument(
+        "--render",
+        action="store_false",
+        dest="no_render",
+        help="Enable env rendering (default: disabled).",
+    )
+    parser.add_argument(
+        "--no_render",
+        action="store_true",
+        dest="no_render",
+        help="Disable env rendering.",
+    )
+    parser.set_defaults(no_render=True)
     parser.add_argument(
         "--recovery_type",
         type=str,

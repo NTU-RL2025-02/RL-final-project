@@ -2,10 +2,8 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp1"
-# Recovery policy type: "five_q" (default) or "q"
-RECOVERY_TYPE="five_q"
-SESSION_NAME="lunarlander_$EXP_NAME"
+EXP_NAME="exp_pointmaze_medium"
+SESSION_NAME="pointmaze_$EXP_NAME"
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -22,11 +20,11 @@ python3 scripts/run_thriftydagger.py \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \
-  --expert_policy_file models/lunar_lander_best_model \
-  --recovery_policy_file models/lunar_lander_best_model \
+  --expert_policy_file models/best_model_medium \
+  --recovery_policy_file models/best_model_medium \
   --demonstration_set_file models/offline_dataset.pkl \
   --max_expert_query 2000 \
-  --environment LunarLander-v3 \
+  --environment PointMaze_Medium-v3 \
   --no_render \
   --recovery_type $RECOVERY_TYPE \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
