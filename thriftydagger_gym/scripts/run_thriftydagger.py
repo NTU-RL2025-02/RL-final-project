@@ -31,6 +31,7 @@ from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery
 import gymnasium as gym
 import gymnasium_robotics
 from gymnasium_robotics.envs.maze.maps import U_MAZE
+from gymnasium.wrappers import FlattenObservation
 
 from stable_baselines3 import SAC
 
@@ -111,6 +112,7 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
         )
+        env = FlattenObservation(env)
         env = MazeWrapper(env)  # add success wrapper
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
