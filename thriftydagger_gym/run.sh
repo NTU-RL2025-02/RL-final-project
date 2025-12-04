@@ -13,7 +13,7 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
 fi
 
 tmux new-session -d -s "$SESSION_NAME" "
-source ~/.zshrc
+source ~/.bashrc
 conda activate rl-final
 
 python3 scripts/run_thriftydagger.py \
