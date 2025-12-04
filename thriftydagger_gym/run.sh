@@ -1,10 +1,11 @@
 #! /bin/bash
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
+EXP_NAME="expert_thriftydagger"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-EXP_NAME="exp_pointmaze_medium_$TIMESTAMP"
-SESSION_NAME="pointmaze_$EXP_NAME"
+BASENAME="${EXP_NAME}_${TIMESTAMP}"
+SESSION_NAME="pointmaze_$BASENAME"
 RECOVERY_TYPE="five_q"
 
 # 檢查 session 是否已存在
@@ -18,7 +19,7 @@ source ~/.bashrc
 conda activate rl-final
 
 python3 scripts/run_thriftydagger.py \
-  --seed 365365365 \
+  --seed 48763 \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \
@@ -29,7 +30,7 @@ python3 scripts/run_thriftydagger.py \
   --environment 'PointMaze_Medium-v3' \
   --recovery_type $RECOVERY_TYPE \
   --num_test_episodes 100 \
-  $EXP_NAME > output_$EXP_NAME.txt 2>&1
+  $BASENAME > output_$BASENAME.txt 2>&1
 "
 
 echo "Started tmux session: $SESSION_NAME"
