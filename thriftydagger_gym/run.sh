@@ -1,4 +1,4 @@
-#! /bin/zsh
+#! /bin/bash
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
@@ -25,7 +25,7 @@ python3 scripts/run_thriftydagger.py \
   --recovery_policy_file models/best_model_medium \
   --demonstration_set_file models/offline_dataset_mazeMedium_1000.pkl \
   --max_expert_query 2000 \
-  --environment "PointMaze_Medium-v3" \
+  --environment 'PointMaze_Medium-v3' \
   --recovery_type $RECOVERY_TYPE \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
