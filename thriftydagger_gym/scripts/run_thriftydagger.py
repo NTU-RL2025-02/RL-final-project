@@ -146,6 +146,7 @@ def main(args):
             init_model=args.eval,
             max_expert_query=args.max_expert_query,
             recovery_type=args.recovery_type,
+            num_test_episodes=args.num_test_episodes,
         )
     except Exception:
         wandb.finish(exit_code=1)
@@ -218,6 +219,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="filepath to saved pytorch model to initialize weights",
+    )
+    parser.add_argument(
+        "--num_test_episodes",
+        type=int,
+        default=20,
+        help="number of test episodes to run after each iteration",
     )
     args = parser.parse_args()
 

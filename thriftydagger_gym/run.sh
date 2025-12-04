@@ -27,6 +27,7 @@ python3 scripts/run_thriftydagger.py \
   --max_expert_query 2000 \
   --environment 'PointMaze_Medium-v3' \
   --recovery_type $RECOVERY_TYPE \
+  --num_test_episodes 100 \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
 
