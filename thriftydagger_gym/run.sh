@@ -22,8 +22,8 @@ python3 scripts/run_thriftydagger.py \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \
-  --expert_policy_file models/best_model.zip \
-  --recovery_policy_file models/best_model.zip \
+  --expert_policy_file models/lunar_lander_best_model \
+  --recovery_policy_file models/lunar_lander_best_model \
   --demonstration_set_file models/offline_dataset.pkl \
   --max_expert_query 2000 \
   --environment LunarLander-v3 \
