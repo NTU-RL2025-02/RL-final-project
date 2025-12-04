@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from core import MLPQFunction
+from thrifty_gym.algos.core import MLPQFunction
 
 
 class Recovery:
