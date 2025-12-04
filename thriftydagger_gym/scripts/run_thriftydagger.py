@@ -55,7 +55,7 @@ def main(args):
     # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    render = not args.no_render
+    render = args.render
 
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
     gym.register_envs(gymnasium_robotics)
@@ -205,17 +205,11 @@ if __name__ == "__main__":
     parser.add_argument("--environment", type=str, default="PointMaze_Medium-v3")
     parser.add_argument(
         "--render",
-        action="store_false",
-        dest="no_render",
+        action="store_true",
+        dest="render",
         help="Enable env rendering (default: disabled).",
     )
-    parser.add_argument(
-        "--no_render",
-        action="store_true",
-        dest="no_render",
-        help="Disable env rendering.",
-    )
-    parser.set_defaults(no_render=True)
+    parser.set_defaults(render=False)
     parser.add_argument(
         "--recovery_type",
         type=str,

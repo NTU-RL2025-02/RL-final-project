@@ -4,6 +4,7 @@
 
 EXP_NAME="exp_pointmaze_medium"
 SESSION_NAME="pointmaze_$EXP_NAME"
+RECOVERY_TYPE="five_q"
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -22,10 +23,9 @@ python3 scripts/run_thriftydagger.py \
   --targetrate 0.01 \
   --expert_policy_file models/best_model_medium \
   --recovery_policy_file models/best_model_medium \
-  --demonstration_set_file models/offline_dataset.pkl \
+  --demonstration_set_file models/offline_dataset_mazeMedium_1000.pkl \
   --max_expert_query 2000 \
-  --environment PointMaze_Medium-v3 \
-  --no_render \
+  --environment "PointMaze_Medium-v3" \
   --recovery_type $RECOVERY_TYPE \
   $EXP_NAME > output_$EXP_NAME.txt 2>&1
 "
