@@ -2,7 +2,8 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp_pointmaze_medium"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+EXP_NAME="exp_pointmaze_medium_$TIMESTAMP"
 SESSION_NAME="pointmaze_$EXP_NAME"
 RECOVERY_TYPE="five_q"
 
