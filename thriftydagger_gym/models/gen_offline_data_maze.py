@@ -3,10 +3,10 @@ Generate an offline dataset by rolling out a trained SAC policy on LunarLander.
 
 Usage (from thriftydagger_gym/models):
     python gen_offline_data.py \
-        --episodes 100 \
-        --output offline_dataset.pkl
+        --episodes 1000 \
+        --output offline_dataset_mazeMedium_1000.pkl
 
-The script defaults to loading `best_model_medium.zip` (trained with SAC)
+The script defaults to loading `best_model_mediumdense.zip` (trained with SAC)
 and the continuous control environment `PointMaze_Medium-v3`.
 """
 
@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=Path,
-        default=root / "./models/best_model_medium.zip",
+        default=root / "./models/best_model_mediumdense.zip",
         help="Path to trained SAC model (.zip).",
     )
     parser.add_argument(
@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "offline_dataset.pkl",
+        default=root / "offline_dataset_mazeMedium_1000.pkl",
         help="Where to store the collected dataset (pickle).",
     )
     parser.add_argument(

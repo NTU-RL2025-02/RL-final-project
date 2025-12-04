@@ -178,21 +178,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "--expert_policy_file",
         type=str,
-        default="models/best_model_medium",
+        default="models/best_model_mediumdense",
         help="filepath to expert model zip file",
     )
 
     parser.add_argument(
         "--recovery_policy_file",
         type=str,
-        default="models/best_model_medium",
+        default="models/best_model_mediumdense",
         help="filepath to recovery model zip file",
     )
 
     parser.add_argument(
         "--demonstration_set_file",
         type=str,
-        default="models/offline_dataset.pkl",
+        default="models/offline_dataset_mazeMedium_1000.pkl",
         help="filepath to expert data pkl file",
     )
 
