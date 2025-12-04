@@ -21,10 +21,11 @@ from robosuite.wrappers import GymWrapper
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
 from thrifty_gym.utils.run_utils import setup_logger_kwargs
-from thriftydagger_gym.thrifty_gym.utils.wrappers import (
+from thrifty_gym.utils.wrappers import (
     LunarLanderSuccessWrapper,
     MazeWrapper,
 )
+from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery
 
 import gymnasium as gym
 import gymnasium_robotics
@@ -52,11 +53,6 @@ def main(args):
     # 這裡用你搬到比較短路徑的 expert model
     # 路徑是相對於你執行 python 的地方（目前你是在 thriftydagger/scripts 底下跑）
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    expert_model = SAC.load(args.expert_policy_file, device=device)
-    expert_pol = SB3Expert(expert_model)
-    recovery_model = SAC.load(args.recovery_policy_file, device=device)
-    recovery_policy = SB3Expert(recovery_model)
 
     render = not args.no_render
 
@@ -110,6 +106,22 @@ def main(args):
 
     max_ep_len = getattr(env, "_max_episode_steps", 1000)
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
+
+    
+    expert_model = SAC.load(args.expert_policy_file, device=device)
+    expert_pol = SB3Expert(expert_model)
+    # recovery_model = SAC.load(args.recovery_policy_file, device=device)
+    # recovery_policy = SB3Expert(recovery_model)
+    if args.recovery_type == "five_q":
+        recovery_policy = FiveQRecovery(
+            env.observation_space, 
+            env.action_space
+        )
+    else:
+        recovery_policy = QRecovery(
+            env.observation_space,
+            env.action_space
+        )
 
     # ---- 主訓練流程 ----
     try:
