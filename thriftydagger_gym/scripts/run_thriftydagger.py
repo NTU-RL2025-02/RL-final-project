@@ -65,7 +65,7 @@ def main(args):
     # ---- wandb ----
     wandb.init(
         entity="aawrail-RL2025",
-        project="final_project_lunar_lander",
+        project="final_project_maze",
         name=args.exp_name,
         config={
             "seed": args.seed,
