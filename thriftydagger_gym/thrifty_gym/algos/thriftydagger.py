@@ -255,7 +255,7 @@ def pretrain_policies(
                 validation_losses.append(float(np.sum(a_pred - a_sup) ** 2))
 
             print("LossPi", sum(loss_pi_vals) / len(loss_pi_vals))
-            print("LossValid", sum(validation_losses) / len(validation_losses))
+            print("LossValid", sum(validation_losses) / len(validation_losses), flush=True)
 
     return pi_optimizers
 
@@ -447,7 +447,7 @@ def log_epoch(
     print("OnlineBurden", online_burden)
     print("NumSwitchToNov", num_switch_to_human)
     print("NumSwitchToRisk", num_switch_to_recovery)
-    print("NumSwitchBack", num_switch_to_robot)
+    print("NumSwitchBack", num_switch_to_robot, flush=True)
 
     logger.log_tabular("Epoch", epoch_idx)
     logger.log_tabular("LossPi", avg_loss_pi)
@@ -664,7 +664,7 @@ def thrifty(
         ac, replay_buffer, held_out_data, target_rate
     )
     print("Estimated switch-back threshold:", switch2robot_thresh)
-    print("Estimated switch-to threshold:", switch2human_thresh)
+    print("Estimated switch-to threshold:", switch2human_thresh, flush=True)
 
     threshold_cfg = ThresholdConfig()
     qrisk_cfg = QRiskConfig()
@@ -923,7 +923,7 @@ def thrifty(
                         switch2human_thresh,
                         switch2human_thresh2,
                         switch2robot_thresh2,
-                    )
+                    ), flush=True
                 )
 
         # --------------------------------------------------
