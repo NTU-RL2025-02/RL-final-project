@@ -255,7 +255,9 @@ def pretrain_policies(
                 validation_losses.append(float(np.sum(a_pred - a_sup) ** 2))
 
             print("LossPi", sum(loss_pi_vals) / len(loss_pi_vals))
-            print("LossValid", sum(validation_losses) / len(validation_losses), flush=True)
+            print(
+                "LossValid", sum(validation_losses) / len(validation_losses), flush=True
+            )
 
     return pi_optimizers
 
@@ -681,7 +683,7 @@ def thrifty(
             action_space=env.action_space,
             hidden_sizes=ac_kwargs.get("hidden_sizes", (256, 256)),
             activation=ac_kwargs.get("activation", nn.ReLU),
-            q_risk = ac.safety,
+            q_risk=ac.safety,
         )
         print("Using QRecovery (single Q-network)")
     elif recovery_type.lower() == "five_q":
@@ -692,9 +694,11 @@ def thrifty(
             activation=ac_kwargs.get("activation", nn.ReLU),
             num_nets=recovery_kwargs.get("num_nets", num_nets),
             variance_weight=recovery_kwargs.get("variance_weight", 1.0),
-            q_risk = ac.safety,
+            q_risk=ac.safety,
         )
-        print(f"Using FiveQRecovery (5 Q-networks, variance_weight={recovery_kwargs.get('variance_weight', 1.0)})")
+        print(
+            f"Using FiveQRecovery (5 Q-networks, variance_weight={recovery_kwargs.get('variance_weight', 1.0)})"
+        )
     else:
         raise ValueError(f"Unknown recovery_type: {recovery_type}")
 
@@ -923,7 +927,8 @@ def thrifty(
                         switch2human_thresh,
                         switch2human_thresh2,
                         switch2robot_thresh2,
-                    ), flush=True
+                    ),
+                    flush=True,
                 )
 
         # --------------------------------------------------

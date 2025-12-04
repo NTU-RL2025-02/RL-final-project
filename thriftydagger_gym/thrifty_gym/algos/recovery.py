@@ -36,8 +36,8 @@ class Recovery:
         """
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.alpha = 0.9  # for accumulate_risk
-        self.eta = 0.5    # threshold for risk indicator
-        self.R_t = 0.0    # initial risk score for AccumulateRisk
+        self.eta = 0.5  # threshold for risk indicator
+        self.R_t = 0.0  # initial risk score for AccumulateRisk
 
         self.q_risk = q_risk
         self.variance_weight = variance_weight
@@ -50,7 +50,7 @@ class Recovery:
                 MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
                 for _ in range(num_nets)
             ]
-    
+
     def objective(self, obs, action):
         raise NotImplementedError
 
@@ -63,7 +63,7 @@ class Recovery:
     ):
         """
         最大化 self.objective(obs, act)
-        
+
         Parameters:
         -----------
         obs: observation
@@ -77,7 +77,9 @@ class Recovery:
         best_action: numpy array of optimized action
         """
         o = torch.as_tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-        a = torch.as_tensor(init_action, dtype=torch.float32, device=self.device).unsqueeze(0)
+        a = torch.as_tensor(
+            init_action, dtype=torch.float32, device=self.device
+        ).unsqueeze(0)
         a = a.clone().detach().requires_grad_(True)
 
         best_obj = float("-inf")
@@ -137,21 +139,21 @@ class QRecovery(Recovery):
             action_space=action_space,
             hidden_sizes=hidden_sizes,
             activation=activation,
-            num_nets=1,         # 單一 Q-network
+            num_nets=1,  # 單一 Q-network
             variance_weight=1.0,
         )
 
     def objective(self, obs, action):
         # 直接最大化 Q value
         return self.q_networks[0](obs, action).view(-1)[0]
-    
+
     def run(self, obs, init_action, steps=20, lr=0.01, action_bounds=(-1.0, 1.0)):
         # return an action
         return self.gradient_ascent(obs, init_action, steps, lr, action_bounds)
 
 
 class FiveQRecovery(Recovery):
-    def __init__( 
+    def __init__(
         self,
         observation_space,
         action_space,
@@ -181,7 +183,7 @@ class FiveQRecovery(Recovery):
         mean_q = q_stack.mean()
         var_q = q_stack.var(unbiased=False)
         return mean_q - self.variance_weight * var_q
-    
+
     def run(self, obs, init_action, steps=20, lr=0.01, action_bounds=(-1.0, 1.0)):
         # return an action
         return self.gradient_ascent(obs, init_action, steps, lr, action_bounds)
@@ -191,5 +193,3 @@ class FiveQRecovery(Recovery):
     f(a) = mean_Q(a) - lambda * var_Q(a)
     我的想法是，這是一個multi-objective optimization問題，所以直接把mean_Q和var_Q組合成一個函數
     """
-
-

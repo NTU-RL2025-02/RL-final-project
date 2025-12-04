@@ -486,7 +486,7 @@ def retrain_qrisk(
 
     if not q_learning:
         return None
-    
+
     # 重新設定 Q-network optimizer
     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
     q_optimizer = Adam(q_params, lr=pi_lr)
@@ -1039,7 +1039,7 @@ def thrifty(
             data = pickle.load(open("test-rollouts.pkl", "rb"))
             qbuffer.fill_buffer(data)
             os.remove("test-rollouts.pkl")
-            
+
         avg_loss_q = retrain_qrisk(
             ac,
             ac_targ,

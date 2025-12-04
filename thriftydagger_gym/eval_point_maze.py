@@ -78,9 +78,7 @@ def extract_success(info: dict) -> Optional[bool]:
     return None
 
 
-def rollout_episode(
-    model: SAC, env: gym.Env, step_limit: int
-) -> Tuple[bool, bool]:
+def rollout_episode(model: SAC, env: gym.Env, step_limit: int) -> Tuple[bool, bool]:
     """Run a single episode; returns (episode_success, success_key_observed)."""
     obs, info = env.reset()
     saw_success_key = False
@@ -116,7 +114,11 @@ def run_rollouts(
     env = make_env(env_id, render_mode="human" if render else None)
     step_limit = (
         max_steps
-        or (env.spec.max_episode_steps if env.spec and env.spec.max_episode_steps else None)
+        or (
+            env.spec.max_episode_steps
+            if env.spec and env.spec.max_episode_steps
+            else None
+        )
         or FALLBACK_MAX_STEPS
     )
 
@@ -129,7 +131,6 @@ def run_rollouts(
         successes += int(episode_success)
         if episode_success and not saw_success_key:
             fallback_successes += 1
-            
 
     env.close()
     return successes, fallback_successes

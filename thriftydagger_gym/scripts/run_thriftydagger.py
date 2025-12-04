@@ -4,14 +4,14 @@
 # --------------------------------------------------------------
 # Imports
 # --------------------------------------------------------------
-import os
-os.environ["MUJOCO_GL"] = "egl"
+
 # standard libraries
 import numpy as np
 import sys
 import time
 import torch
 import wandb
+import os
 
 # robosuite
 import robosuite as suite
@@ -33,6 +33,8 @@ import gymnasium_robotics
 from gymnasium_robotics.envs.maze.maps import U_MAZE
 
 from stable_baselines3 import SAC
+
+os.environ["MUJOCO_GL"] = "egl"
 
 
 class SB3Expert:
@@ -116,21 +118,15 @@ def main(args):
     max_ep_len = getattr(env, "_max_episode_steps", 1000)
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
-    
     expert_model = SAC.load(args.expert_policy_file, device=device)
     expert_pol = SB3Expert(expert_model)
     # recovery_model = SAC.load(args.recovery_policy_file, device=device)
     # recovery_policy = SB3Expert(recovery_model)
+    recovery_policy = None
     if args.recovery_type == "five_q":
-        recovery_policy = FiveQRecovery(
-            env.observation_space, 
-            env.action_space
-        )
+        recovery_policy = FiveQRecovery(env.observation_space, env.action_space)
     else:
-        recovery_policy = QRecovery(
-            env.observation_space,
-            env.action_space
-        )
+        recovery_policy = QRecovery(env.observation_space, env.action_space)
 
     # ---- 主訓練流程 ----
     try:

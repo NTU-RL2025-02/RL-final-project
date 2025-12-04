@@ -7,7 +7,7 @@ from gymnasium.spaces import flatten_space
 
 
 def _flatten_maze_observation(
-    obs: Union[np.ndarray, Dict[str, np.ndarray]]
+    obs: Union[np.ndarray, Dict[str, np.ndarray]],
 ) -> np.ndarray:
     """
     Flatten PointMaze's dict observation into a single float32 vector.
@@ -28,7 +28,9 @@ def _flatten_maze_observation(
                 parts.append(np.asarray(value, dtype=np.float32).ravel())
 
         if not parts:
-            raise ValueError("Dict observation did not contain any flattenable entries.")
+            raise ValueError(
+                "Dict observation did not contain any flattenable entries."
+            )
 
         return np.concatenate(parts, axis=0).astype(np.float32, copy=False)
 
