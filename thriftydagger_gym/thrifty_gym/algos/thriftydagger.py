@@ -780,7 +780,7 @@ def thrifty(
                 # 檢查是否需要切到 human：novelty / risk
                 # --------------------------------------------------
                 if not expert_mode and ac.variance(o) > switch2human_thresh:
-                    print("Switch to Human (Novel)")
+                    print("Switch to Expert (Novel)")
                     num_switch_to_human += 1
                     expert_mode = True
 
@@ -788,7 +788,7 @@ def thrifty(
                     not (expert_mode or safety_mode)
                     and ac.safety(o, a_robot) < switch2human_thresh2
                 ):
-                    print("Switch to Human (Risk)")
+                    print("Switch to Recovery (Risk)")
                     num_switch_to_recovery += 1
                     safety_mode = True
 
