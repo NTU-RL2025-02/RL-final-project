@@ -839,10 +839,7 @@ def thrifty(
                     sup.append(1)
                     qbuffer.store(o, a_recovery, o2, int(s_flag), done)
 
-                    if (
-                        np.sum((a_robot - a_recovery) ** 2) < switch2robot_thresh
-                        and ac.safety(o, a_robot) > switch2robot_thresh2
-                    ):
+                    if ac.safety(o, a_robot) > switch2robot_thresh2:
                         print("Switch to Robot from Recovery")
                         safety_mode = False
                         num_switch_to_robot += 1
