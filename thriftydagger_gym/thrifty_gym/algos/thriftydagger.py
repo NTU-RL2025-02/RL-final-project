@@ -499,6 +499,7 @@ def thrifty(
     max_expert_query: int = 2000,
     recovery_type: str = "five_q",
     recovery_kwargs: Dict[str, Any] = dict(),
+    fix_thresholds: bool = False,
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -915,7 +916,10 @@ def thrifty(
             )
 
             # online 更新 switching thresholds
-            if len(estimates) > threshold_cfg.min_estimates_for_update:
+            if (
+                len(estimates) > threshold_cfg.min_estimates_for_update
+                and not fix_thresholds
+            ):
                 target_idx = int((1 - target_rate) * len(estimates))
                 switch2human_thresh = sorted(estimates)[target_idx]
                 switch2human_thresh2 = sorted(estimates2, reverse=True)[target_idx]

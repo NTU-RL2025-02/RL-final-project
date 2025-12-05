@@ -228,6 +228,13 @@ if __name__ == "__main__":
         default=20,
         help="number of test episodes to run after each iteration",
     )
+    parser.add_argument(
+        "--fix_thresholds",
+        action="store_true",
+        dest="fix_thresholds",
+        help="Fix switching thresholds and do not update online. Will disable target rate adaptation.",
+    )
+    parser.set_defaults(fix_thresholds=False)
     args = parser.parse_args()
 
     main(args)
