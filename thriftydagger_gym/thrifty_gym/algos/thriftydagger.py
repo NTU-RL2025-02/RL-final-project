@@ -666,8 +666,8 @@ def thrifty(
     switch2robot_thresh, switch2human_thresh = estimate_initial_thresholds(
         ac, replay_buffer, held_out_data, target_rate
     )
-    print("Estimated switch-back threshold:", switch2robot_thresh)
-    print("Estimated switch-to threshold:", switch2human_thresh, flush=True)
+    print("Estimated switch to expert threshold:", switch2human_thresh, flush=True)
+    print("Estimated switch-back threshold:", switch2robot_thresh, flush=True)
 
     threshold_cfg = ThresholdConfig()
     qrisk_cfg = QRiskConfig()
