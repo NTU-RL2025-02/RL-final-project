@@ -772,7 +772,7 @@ def thrifty(
                 s_flag = False
 
                 if not expert_mode:
-                    # 只有在非 expert_mode 時才把 variance / safety 納入 estimates
+                    # 只有在非 expert_mode 時才把 variance / safety 納入 estimates，避免重複計算
                     estimates.append(ac.variance(o))
                     estimates2.append(ac.safety(o, a_robot))
 
@@ -783,7 +783,6 @@ def thrifty(
                     print("Switch to Human (Novel)")
                     num_switch_to_human += 1
                     expert_mode = True
-                    continue
 
                 elif (
                     not (expert_mode or safety_mode)
@@ -792,7 +791,6 @@ def thrifty(
                     print("Switch to Human (Risk)")
                     num_switch_to_recovery += 1
                     safety_mode = True
-                    continue
 
                 # --------------------------------------------------
                 # expert_mode：由 human expert 控制
