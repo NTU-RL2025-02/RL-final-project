@@ -777,6 +777,24 @@ def thrifty(
                     estimates2.append(ac.safety(o, a_robot))
 
                 # --------------------------------------------------
+                # 檢查是否需要切到 human：novelty / risk
+                # --------------------------------------------------
+                if not expert_mode and ac.variance(o) > switch2human_thresh:
+                    print("Switch to Human (Novel)")
+                    num_switch_to_human += 1
+                    expert_mode = True
+                    continue
+
+                elif (
+                    not (expert_mode or safety_mode)
+                    and ac.safety(o, a_robot) < switch2human_thresh2
+                ):
+                    print("Switch to Human (Risk)")
+                    num_switch_to_recovery += 1
+                    safety_mode = True
+                    continue
+
+                # --------------------------------------------------
                 # expert_mode：由 human expert 控制
                 # --------------------------------------------------
                 if expert_mode:
@@ -787,27 +805,23 @@ def thrifty(
                     # safety critic 對 expert action 的評分
                     risk.append(float(ac.safety(o, a_expert)))
 
-                    if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh and (
-                        ac.safety(o, a_robot) > switch2robot_thresh2
-                    ):
-                        print("Switch to Robot")
-                        expert_mode = False
-                        num_switch_to_robot += 1
-
-                        o2, r, terminated, truncated, _ = env.step(a_expert)
-                        done = terminated or truncated
-                        episode_reward += r
-                        s_flag = env.is_success()
-                    else:
-                        o2, r, terminated, truncated, _ = env.step(a_expert)
-                        done = terminated or truncated
-                        episode_reward += r
-                        s_flag = env.is_success()
+                    o2, r, terminated, truncated, _ = env.step(a_expert)
+                    done = terminated or truncated
+                    episode_reward += r
+                    s_flag = env.is_success()
 
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised (human / recovery)
 
                     qbuffer.store(o, a_expert, o2, int(s_flag), done)
+
+                    if (
+                        np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh
+                        and ac.safety(o, a_robot) > switch2robot_thresh2
+                    ):
+                        print("Switch to Robot from Novelty")
+                        expert_mode = False
+                        num_switch_to_robot += 1
 
                 # --------------------------------------------------
                 # safety_mode：由 recovery policy 控制
@@ -818,46 +832,22 @@ def thrifty(
                     replay_buffer.store(o, a_recovery)
                     risk.append(float(ac.safety(o, a_recovery)))
 
-                    if np.sum((a_robot - a_recovery) ** 2) < switch2robot_thresh and (
-                        ac.safety(o, a_robot) > switch2robot_thresh2
-                    ):
-                        print("Switch to Robot")
-                        safety_mode = False
-                        num_switch_to_robot += 1
-                        o2, r, terminated, truncated, _ = env.step(a_recovery)
-                        episode_reward += r
-                        s_flag = env.is_success()
-                        done = (
-                            terminated or truncated or s_flag or (ep_len + 1 >= horizon)
-                        )
-
-                    else:
-                        o2, r, terminated, truncated, _ = env.step(a_recovery)
-                        episode_reward += r
-                        s_flag = env.is_success()
-                        done = (
-                            terminated or truncated or s_flag or (ep_len + 1 >= horizon)
-                        )
+                    o2, r, terminated, truncated, _ = env.step(a_recovery)
+                    episode_reward += r
+                    s_flag = env.is_success()
+                    done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_recovery)
                     sup.append(1)
-
                     qbuffer.store(o, a_recovery, o2, int(s_flag), done)
 
-                # --------------------------------------------------
-                # 檢查是否需要切到 human：novelty / risk
-                # --------------------------------------------------
-                elif ac.variance(o) > switch2human_thresh:
-                    print("Switch to Human (Novel)")
-                    num_switch_to_human += 1
-                    expert_mode = True
-                    continue
-
-                elif ac.safety(o, a_robot) < switch2human_thresh2:
-                    print("Switch to Human (Risk)")
-                    num_switch_to_recovery += 1
-                    safety_mode = True
-                    continue
+                    if (
+                        np.sum((a_robot - a_recovery) ** 2) < switch2robot_thresh
+                        and ac.safety(o, a_robot) > switch2robot_thresh2
+                    ):
+                        print("Switch to Robot from Recovery")
+                        safety_mode = False
+                        num_switch_to_robot += 1
 
                 # --------------------------------------------------
                 # 一般情況：由 robot policy 控制
