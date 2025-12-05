@@ -423,6 +423,10 @@ def log_epoch(
     num_switch_to_robot: int,
     loss_pi: Optional[float],
     loss_q: Optional[float],
+    switch2robot_thresh: float,
+    switch2human_thresh: float,
+    switch2robot_thresh2: float,
+    switch2human_thresh2: float,
 ) -> None:
     """
     負責：
@@ -457,6 +461,10 @@ def log_epoch(
     logger.log_tabular("NumSwitchToRisk", num_switch_to_recovery)
     logger.log_tabular("NumSwitchBack", num_switch_to_robot)
     logger.log_tabular("OnlineBurden", online_burden)
+    logger.log_tabular("Switch2RobotThresh", switch2robot_thresh)
+    logger.log_tabular("Switch2HumanThresh", switch2human_thresh)
+    logger.log_tabular("Switch2RobotThresh2", switch2robot_thresh2)
+    logger.log_tabular("Switch2HumanThresh2", switch2human_thresh2)
 
     logger.dump_tabular()
 
@@ -1012,6 +1020,10 @@ def thrifty(
             num_switch_to_robot=num_switch_to_robot,
             loss_pi=avg_loss_pi,
             loss_q=avg_loss_q,
+            switch2robot_thresh=switch2robot_thresh,
+            switch2human_thresh=switch2human_thresh,
+            switch2robot_thresh2=switch2robot_thresh2,
+            switch2human_thresh2=switch2human_thresh2,
         )
 
         # --------------------------------------------------
