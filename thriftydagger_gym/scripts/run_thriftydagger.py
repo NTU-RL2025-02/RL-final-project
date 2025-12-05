@@ -13,18 +13,13 @@ import torch
 import wandb
 import os
 
-# robosuite
-import robosuite as suite
-from robosuite.controllers import load_composite_controller_config
-from robosuite.wrappers import VisualizationWrapper
-from robosuite.wrappers import GymWrapper
-
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
 from thrifty_gym.utils.run_utils import setup_logger_kwargs
 from thrifty_gym.utils.wrappers import (
     LunarLanderSuccessWrapper,
     MazeWrapper,
+    NoisyActionWrapper,
 )
 from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery
 
@@ -114,6 +109,7 @@ def main(args):
         )
         env = FlattenObservation(env)
         env = MazeWrapper(env)  # add success wrapper
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
 
@@ -234,6 +230,12 @@ if __name__ == "__main__":
         help="Fix switching thresholds and do not update online. Will disable target rate adaptation.",
     )
     parser.set_defaults(fix_thresholds=False)
+    parser.add_argument(
+        "--noisy_scale",
+        type=float,
+        default=0,
+        help="Scale of noise to add to actions when training the recovery policy. 0 means no noise.",
+    )
     args = parser.parse_args()
 
     main(args)
