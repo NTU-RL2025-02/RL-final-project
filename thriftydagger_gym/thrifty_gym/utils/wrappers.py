@@ -1,9 +1,7 @@
 from typing import Dict, Sequence, Union
 
 import numpy as np
-from gymnasium import Wrapper
-from gymnasium.spaces import Box
-from gymnasium.spaces import flatten_space
+from gymnasium import Wrapper, ActionWrapper
 
 
 class LunarLanderSuccessWrapper(Wrapper):
@@ -40,8 +38,6 @@ class MazeWrapper(Wrapper):
     def __init__(self, env):
         super().__init__(env)
         self.success = False
-        
-
 
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
@@ -56,3 +52,30 @@ class MazeWrapper(Wrapper):
 
     def is_success(self):
         return self.success
+
+
+class NoisyActionWrapper(ActionWrapper):
+    def __init__(self, env, noise_scale=0.1):
+        super().__init__(env)
+        self.noise_scale = noise_scale
+        self.enabled = True  # 控制要不要加 noise
+
+    def action(self, action):
+        if not self.enabled or self.noise_scale == 0:
+            return action
+
+        # 連續 action 範例，離散可以改成別的邏輯
+        noise = self.noise_scale * np.random.randn(*np.array(action).shape)
+        noisy_action = action + noise
+
+        # 夾回 action_space 範圍
+        if hasattr(self.env.action_space, "low"):
+            noisy_action = np.clip(
+                noisy_action, self.env.action_space.low, self.env.action_space.high
+            )
+        return noisy_action
+
+    def set_noise(self, enabled: bool = True, noise_scale: float | None = None):
+        self.enabled = enabled
+        if noise_scale is not None:
+            self.noise_scale = noise_scale
