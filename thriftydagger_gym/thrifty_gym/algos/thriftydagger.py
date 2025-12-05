@@ -813,10 +813,7 @@ def thrifty(
 
                     qbuffer.store(o, a_expert, o2, int(s_flag), done)
 
-                    if (
-                        np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh
-                        and ac.safety(o, a_robot) > switch2robot_thresh2
-                    ):
+                    if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh:
                         print("Switch to Robot from Novelty")
                         expert_mode = False
                         num_switch_to_robot += 1
