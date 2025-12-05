@@ -144,7 +144,6 @@ def main(args):
             input_file=args.demonstration_set_file,
             robosuite=False,
             gym_cfg=gym_cfg,  # 或者直接傳 None
-            q_learning=True,
             init_model=args.eval,
             max_expert_query=args.max_expert_query,
             recovery_type=args.recovery_type,

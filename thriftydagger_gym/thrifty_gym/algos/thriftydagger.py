@@ -370,7 +370,6 @@ def retrain_qrisk(
     ac: Any,
     ac_targ: Any,
     qbuffer: QReplayBuffer,
-    q_learning: bool,
     num_test_episodes: int,
     expert_policy: Any,
     recovery_policy: Any,
@@ -391,8 +390,6 @@ def retrain_qrisk(
     若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
     否則回傳 None。
     """
-    if not q_learning:
-        return None
 
     # 重新設定 Q-network optimizer
     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
@@ -426,7 +423,6 @@ def log_epoch(
     num_switch_to_robot: int,
     loss_pi: Optional[float],
     loss_q: Optional[float],
-    q_learning: bool,
 ) -> None:
     """
     負責：
@@ -440,7 +436,7 @@ def log_epoch(
 
     if loss_pi is not None:
         print("LossPi", avg_loss_pi)
-    if q_learning and loss_q is not None:
+    if loss_q is not None:
         print("LossQ", avg_loss_q)
 
     print("TotalEpisodes", ep_num)
@@ -453,8 +449,7 @@ def log_epoch(
 
     logger.log_tabular("Epoch", epoch_idx)
     logger.log_tabular("LossPi", avg_loss_pi)
-    if q_learning:
-        logger.log_tabular("LossQ", avg_loss_q)
+    logger.log_tabular("LossQ", avg_loss_q)
     logger.log_tabular("TotalEpisodes", ep_num)
     logger.log_tabular("TotalEnvInteracts", total_env_interacts)
     logger.log_tabular("SuccessRate", success_rate)
@@ -493,7 +488,6 @@ def thrifty(
     target_rate: float = 0.01,
     robosuite: bool = False,
     gym_cfg: Optional[Dict[str, Any]] = None,
-    q_learning: bool = True,
     gamma: float = 0.9999,
     init_model: Optional[str] = None,
     max_expert_query: int = 2000,
@@ -786,7 +780,7 @@ def thrifty(
                     risk.append(float(ac.safety(o, a_expert)))
 
                     if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh and (
-                        not q_learning or ac.safety(o, a_robot) > switch2robot_thresh2
+                        ac.safety(o, a_robot) > switch2robot_thresh2
                     ):
                         print("Switch to Robot")
                         expert_mode = False
@@ -817,7 +811,7 @@ def thrifty(
                     risk.append(float(ac.safety(o, a_recovery)))
 
                     if np.sum((a_robot - a_recovery) ** 2) < switch2robot_thresh and (
-                        not q_learning or ac.safety(o, a_robot) > switch2robot_thresh2
+                        ac.safety(o, a_robot) > switch2robot_thresh2
                     ):
                         print("Switch to Robot")
                         safety_mode = False
@@ -851,7 +845,7 @@ def thrifty(
                     expert_mode = True
                     continue
 
-                elif q_learning and ac.safety(o, a_robot) < switch2human_thresh2:
+                elif ac.safety(o, a_robot) < switch2human_thresh2:
                     print("Switch to Human (Risk)")
                     num_switch_to_recovery += 1
                     safety_mode = True
@@ -977,32 +971,30 @@ def thrifty(
         # 10-3. retrain Q-risk safety critic
         # --------------------------------------------------
 
-        if q_learning:
-            data = pickle.load(open("test-rollouts.pkl", "rb"))
-            qbuffer.fill_buffer(data)
-            os.remove("test-rollouts.pkl")
+        data = pickle.load(open("test-rollouts.pkl", "rb"))
+        qbuffer.fill_buffer(data)
+        os.remove("test-rollouts.pkl")
 
-            avg_loss_q = retrain_qrisk(
-                ac,
-                ac_targ,
-                qbuffer,
-                q_learning,
-                num_test_episodes,
-                expert_policy,
-                recovery_policy,
-                env,
-                act_limit,
-                horizon,
-                robosuite,
-                logger_kwargs,
-                pi_lr,
-                bc_epochs,
-                grad_steps,
-                gamma,
-                batch_size,
-                qrisk_cfg,
-                epoch_idx,
-            )
+        avg_loss_q = retrain_qrisk(
+            ac,
+            ac_targ,
+            qbuffer,
+            num_test_episodes,
+            expert_policy,
+            recovery_policy,
+            env,
+            act_limit,
+            horizon,
+            robosuite,
+            logger_kwargs,
+            pi_lr,
+            bc_epochs,
+            grad_steps,
+            gamma,
+            batch_size,
+            qrisk_cfg,
+            epoch_idx,
+        )
 
         # --------------------------------------------------
         # 10-4. end-of-epoch logging
@@ -1019,8 +1011,7 @@ def thrifty(
             num_switch_to_recovery=num_switch_to_recovery,
             num_switch_to_robot=num_switch_to_robot,
             loss_pi=avg_loss_pi,
-            loss_q=avg_loss_q if q_learning else None,
-            q_learning=q_learning,
+            loss_q=avg_loss_q,
         )
 
         # --------------------------------------------------
