@@ -84,7 +84,7 @@ N_ENVS = 16
 EVAL_ENVS = 1
 
 # Evaluation callback frequency (timesteps) and evaluation episodes
-EVAL_FREQ = 50_000
+EVAL_FREQ = 3125
 N_EVAL_EPISODES = 10
 
 VIDEO_RECORD_FREQ = 50_000
@@ -147,7 +147,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
         else:
             shaped_reward = 0.0
 
-        shaped_reward = shaped_reward - 2
+        shaped_reward = shaped_reward - 10
 
         flat_obs = self.observation(obs_dict)
         return flat_obs, shaped_reward, terminated, truncated, info
@@ -395,6 +395,7 @@ def main() -> None:
         render=False,
         deterministic=True,
         n_eval_episodes=N_EVAL_EPISODES,
+        verbose=1,
     )
 
     checkpoint_callback = CheckpointCallback(
