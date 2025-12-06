@@ -183,19 +183,18 @@ def test_agent(
             reward_list.append(int(success))
 
             ep_len += 1
+
         csv_path = os.path.join(
-                    logger_kwargs["output_dir"],
-                    f"ball_traj_epoch{epoch_idx}_ep{ep_num}.csv",
-                )
+            logger_kwargs["output_dir"],
+            f"ball_traj_epoch{epoch}_ep{episode_idx}.csv",
+        )
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["ball_x", "ball_y"])
             writer.writerows(ball_traj)
         print(
-            f"[Saved] ball trajectory for epoch {epoch_idx}, episode {ep_num} -> {csv_path}"
+            f"[Saved] ball trajectory for epoch {epoch}, episode {episode_idx} -> {csv_path}"
         )
-        # Reset for next episode
-        ball_traj = []
 
     success_rate = sum(reward_list) / num_test_episodes
     data = {
@@ -928,7 +927,6 @@ def thrifty(
 
                 done_flags.append(done)
                 rew.append(int(s_flag))
-                
 
                 o = o2
                 obs.append(o)
@@ -944,7 +942,6 @@ def thrifty(
             if done:
                 ep_num += 1
                 # === Save per-episode ball trajectory ===
-                
 
             total_env_interacts += ep_len
 
