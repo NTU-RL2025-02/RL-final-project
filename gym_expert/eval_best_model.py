@@ -75,7 +75,9 @@ def load_maze(maze_file: Path) -> Optional[list]:
         ]
 
 
-def make_env(env_id: str, maze_map: Optional[list], render_mode: Optional[str]) -> gym.Env:
+def make_env(
+    env_id: str, maze_map: Optional[list], render_mode: Optional[str]
+) -> gym.Env:
     env_kwargs = {"render_mode": render_mode}
     if maze_map is not None:
         env_kwargs["maze_map"] = maze_map
