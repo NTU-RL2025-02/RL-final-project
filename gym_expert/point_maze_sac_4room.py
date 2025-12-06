@@ -52,7 +52,7 @@ NAME_PREFIX = "point_maze_sac"
 MAZE_FILE = "maze_4room.txt"
 
 with open(MAZE_FILE) as file:
-    MAZE = [list(map(int, line.split())) for line in file.readlines()]
+    MAZE = [list(map(lambda x: int(x) if x in ["0", "1"] else x, line.split())) for line in file.readlines()]
         
 # Training/evaluation kwargs keep rendering off for speed; video env enables RGB frames.
 TRAIN_EVAL_ENV_KWARGS = {"render_mode": None, 'maze_map': MAZE}
