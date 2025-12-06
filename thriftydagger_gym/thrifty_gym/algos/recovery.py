@@ -193,3 +193,23 @@ class FiveQRecovery(Recovery):
     f(a) = mean_Q(a) - lambda * var_Q(a)
     我的想法是，這是一個multi-objective optimization問題，所以直接把mean_Q和var_Q組合成一個函數
     """
+
+
+class ExpertAsRecovery(Recovery):
+    def __init__(self, expert_policy):
+        """
+        expert_policy: callable, takes obs and returns action
+        """
+        super().__init__(
+            q_risk=None,
+            observation_space=None,
+            action_space=None,
+            hidden_sizes=(),
+            activation=None,
+            num_nets=0,
+            variance_weight=0.0,
+        )
+        self.expert_policy = expert_policy
+
+    def run(self, obs, init_action=None, **kwargs):
+        return self.expert_policy(obs)

@@ -752,6 +752,8 @@ def thrifty(
         print(
             f"Using FiveQRecovery (5 Q-networks, variance_weight={recovery_kwargs.get('variance_weight', 1.0)})"
         )
+    elif recovery_type.lower() == "expert":
+        print("Using Expert Recovery Policy")
     else:
         raise ValueError(f"Unknown recovery_type: {recovery_type}")
 

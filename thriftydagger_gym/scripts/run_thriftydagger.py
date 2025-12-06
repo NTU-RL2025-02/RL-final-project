@@ -21,7 +21,7 @@ from thrifty_gym.utils.wrappers import (
     MazeWrapper,
     NoisyActionWrapper,
 )
-from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery
+from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery, ExpertAsRecovery
 from thrifty_gym.maze import FOUR_ROOMS_21x21
 
 import gymnasium as gym
@@ -144,7 +144,7 @@ def main(args):
     elif args.recovery_type == "q":
         recovery_policy = QRecovery(env.observation_space, env.action_space)
     elif args.recovery_type == "expert":
-        recovery_policy = expert_pol
+        recovery_policy = ExpertAsRecovery(expert_pol)
     else:
         recovery_policy = QRecovery(env.observation_space, env.action_space)
 
