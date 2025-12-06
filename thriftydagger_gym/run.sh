@@ -1,12 +1,12 @@
 #! /bin/bash
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
-EXP_NAME="1206_csv_test"
+EXP_NAME="exp_expert_success_rate"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
-RECOVERY_TYPE="five_q"
+RECOVERY_TYPE="expert"
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then

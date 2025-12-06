@@ -124,8 +124,12 @@ def main(args):
     recovery_policy = None
     if args.recovery_type == "five_q":
         recovery_policy = FiveQRecovery(env.observation_space, env.action_space)
-    else:
+    elif args.recovery_type == "q":
         recovery_policy = QRecovery(env.observation_space, env.action_space)
+    elif args.recovery_type == "expert":
+        recovery_policy = expert_pol
+    else:
+        raise NotImplementedError("This policy is not implemented in this script.")
 
     # ---- 主訓練流程 ----
     try:
