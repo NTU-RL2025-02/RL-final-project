@@ -877,6 +877,16 @@ def thrifty(
 
             if done:
                 ep_num += 1
+                # === Save per-episode ball trajectory ===
+                csv_path = os.path.join(logger_kwargs["output_dir"],f"ball_traj_epoch{epoch_idx}_ep{ep_num}.csv")
+                with open(csv_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["ball_x", "ball_y"])
+                    writer.writerows(ball_traj)
+                print(f"[Saved] ball trajectory for epoch {epoch_idx}, episode {ep_num} -> {csv_path}")
+                # Reset for next episode
+                ball_traj = []
+
 
             total_env_interacts += ep_len
 
@@ -892,7 +902,7 @@ def thrifty(
                 "beta_R": switch2robot_thresh,
                 "eps_H": switch2human_thresh2,
                 "eps_R": switch2robot_thresh2,
-                "simstates": np.array(simstates) # if robosuite else None,
+                "simstates": np.array(simstates) if robosuite else None,
             }
             logging_data.append(episode_dict)
 
@@ -997,13 +1007,6 @@ def thrifty(
         # 10-4. end-of-epoch logging
         # --------------------------------------------------
         logger.save_state(dict())
-        #log ball traj to .csv file
-        csv_path = os.path.join(logger_kwargs["output_dir"], f"ball_traj_epoch{epoch_idx}.csv")
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["ball_x", "ball_y"])
-            writer.writerows(ball_traj)
-        print(f"[Saved] ball trajectory to {csv_path}")
 
         log_epoch(
             logger=logger,
