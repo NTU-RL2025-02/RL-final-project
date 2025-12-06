@@ -9,6 +9,7 @@ import itertools
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+import csv
 
 import numpy as np
 import torch
@@ -523,6 +524,7 @@ def thrifty(
         logger.save_config(_locals)
     except TypeError as e:
         print(f"[Warning] Could not save config as JSON: {e}")
+    
 
     # ----------------------------------------------------------
     # 2. 裝置選擇與隨機種子
@@ -724,6 +726,7 @@ def thrifty(
         # --------------------------------------------------
         # 10-1. 線上資料收集（epoch 0 跳過，保留給純 Q-training）
         # --------------------------------------------------
+        ball_traj = [] # 用於紀錄球的軌跡
         step_count = 0
         if epoch_idx == 0:
             step_count = obs_per_iter  # 不跑 while loop
@@ -858,6 +861,8 @@ def thrifty(
 
                 done_flags.append(done)
                 rew.append(int(s_flag))
+                ball_x, ball_y = o2[0], o2[1]
+                ball_traj.append([ball_x, ball_y]) #存入綠色球的軌跡
 
                 o = o2
                 obs.append(o)
@@ -898,6 +903,8 @@ def thrifty(
                     "wb",
                 ),
             )
+            
+            
 
             # online 更新 switching thresholds
             if (
@@ -990,6 +997,14 @@ def thrifty(
         # 10-4. end-of-epoch logging
         # --------------------------------------------------
         logger.save_state(dict())
+        #log ball traj to .csv file
+        csv_path = os.path.join(logger_kwargs["output_dir"], f"ball_traj_epoch{epoch_idx}.csv")
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["ball_x", "ball_y"])
+            writer.writerows(ball_traj)
+        print(f"[Saved] ball trajectory to {csv_path}")
+
         log_epoch(
             logger=logger,
             epoch_idx=epoch_idx,
