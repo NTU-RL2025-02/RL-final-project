@@ -503,6 +503,10 @@ def thrifty(
     recovery_type: str = "five_q",
     recovery_kwargs: Dict[str, Any] = dict(),
     fix_thresholds: bool = False,
+    # ------- 新增：BC checkpoint 相關參數 -------
+    bc_checkpoint: Optional[str] = None,
+    save_bc_checkpoint: Optional[str] = None,
+    skip_bc_pretrain: bool = False,
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -513,7 +517,12 @@ def thrifty(
       3. 每個 iter 重新用 aggregate data 做一次 DAgger-style retrain
       4. 選擇性地訓練 Q-risk safety critic
     """
-
+    # 如果同時給 init_model 跟 bc_checkpoint，容易搞混，直接擋掉
+    if init_model is not None and bc_checkpoint is not None:
+        raise ValueError(
+            "Both init_model and bc_checkpoint are provided. "
+            "Please use only one of them to initialize the policy."
+        )
     # ----------------------------------------------------------
     # 1. 建立 logger 並存 config（不包含 env，避免 JSON 序列化問題）
     # ----------------------------------------------------------
@@ -650,19 +659,59 @@ def thrifty(
     # ----------------------------------------------------------
     # 8. 利用 offline data 先做 pre-training (BC)
     # ----------------------------------------------------------
-    pi_optimizers = pretrain_policies(
-        ac,
-        replay_buffer,
-        held_out_data,
-        grad_steps,
-        bc_epochs,
-        batch_size,
-        replay_size,
-        obs_dim,
-        act_dim,
-        device,
-        pi_lr,
-    )
+
+    if bc_checkpoint is not None and os.path.isfile(bc_checkpoint):
+        print(f"[BC] Loading pretrained BC policy from {bc_checkpoint}")
+        try:
+            ac_loaded = torch.load(
+                bc_checkpoint, map_location=device, weights_only=False
+            )
+        except TypeError:
+            ac_loaded = torch.load(bc_checkpoint, map_location=device)
+        ac = ac_loaded.to(device)
+        ac.device = device
+
+        # 更新 target network
+        ac_targ = deepcopy(ac)
+        for p in ac_targ.parameters():
+            p.requires_grad = False
+
+        # 重新註冊到 logger（確保之後 save_state 存的是這個 ac）
+        logger.setup_pytorch_saver(ac)
+
+    elif skip_bc_pretrain:
+        # 使用者要求跳過 pretrain，但又沒有可用的 checkpoint → 直接報錯
+        raise ValueError(
+            "skip_bc_pretrain=True but no valid bc_checkpoint is found.\n"
+            "Please either:\n"
+            "  (1) run once with --save_bc_checkpoint to create a BC checkpoint, or\n"
+            "  (2) provide a valid --bc_checkpoint path."
+        )
+    else:
+        # 正常情況：先跑一次 BC pretrain
+        print("[BC] Starting offline BC pretraining...")
+        pi_optimizers = pretrain_policies(
+            ac,
+            replay_buffer,
+            held_out_data,
+            grad_steps,
+            bc_epochs,
+            batch_size,
+            replay_size,
+            obs_dim,
+            act_dim,
+            device,
+            pi_lr,
+        )
+        print("[BC] Pretraining finished.")
+
+        # 若指定要存 checkpoint，就把 ac 存起來
+        if save_bc_checkpoint is not None:
+            save_dir = os.path.dirname(save_bc_checkpoint)
+            if save_dir:
+                os.makedirs(save_dir, exist_ok=True)
+            torch.save(ac, save_bc_checkpoint)
+            print(f"[BC] Saved pretrained BC policy to {save_bc_checkpoint}")
 
     # ----------------------------------------------------------
     # 9. 初始化統計量與 thresholds

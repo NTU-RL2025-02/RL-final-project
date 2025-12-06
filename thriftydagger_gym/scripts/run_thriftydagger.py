@@ -74,6 +74,10 @@ def main(args):
             "recovery_policy_file": args.recovery_policy_file,
             "demonstration_set_file": args.demonstration_set_file,
             "recovery_type": args.recovery_type,
+            # 新增：記錄 BC 相關設定
+            "bc_checkpoint": args.bc_checkpoint,
+            "save_bc_checkpoint": args.save_bc_checkpoint,
+            "skip_bc_pretrain": args.skip_bc_pretrain,
         },
     )
 
@@ -581,6 +585,10 @@ def main(args):
             max_expert_query=args.max_expert_query,
             recovery_type=args.recovery_type,
             num_test_episodes=args.num_test_episodes,
+            # 新增：把 BC 相關參數傳給 thrifty
+            bc_checkpoint=args.bc_checkpoint,
+            save_bc_checkpoint=args.save_bc_checkpoint,
+            skip_bc_pretrain=args.skip_bc_pretrain,
         )
     except Exception:
         wandb.finish(exit_code=1)
@@ -673,6 +681,35 @@ if __name__ == "__main__":
         default=0,
         help="Scale of noise to add to actions when training the recovery policy. 0 means no noise.",
     )
+    # -------- BC 相關 CLI 參數 --------
+    parser.add_argument(
+        "--bc_checkpoint",
+        type=str,
+        default=None,
+        help=(
+            "Path to pretrained BC policy checkpoint. "
+            "Typical use: --bc_checkpoint models/bc_policy_medium.pt --skip_bc_pretrain"
+        ),
+    )
+    parser.add_argument(
+        "--save_bc_checkpoint",
+        type=str,
+        default=None,
+        help=(
+            "If set, save BC policy after the initial pretraining to this path. "
+            "Typical use (first run): --save_bc_checkpoint models/bc_policy_medium.pt"
+        ),
+    )
+    parser.add_argument(
+        "--skip_bc_pretrain",
+        action="store_true",
+        dest="skip_bc_pretrain",
+        help=(
+            "Skip BC pretraining step and rely on --bc_checkpoint. "
+            "Will raise an error inside thrifty() if the checkpoint is missing."
+        ),
+    )
+    parser.set_defaults(skip_bc_pretrain=False)
     args = parser.parse_args()
 
     main(args)
