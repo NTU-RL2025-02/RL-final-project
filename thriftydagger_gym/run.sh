@@ -2,12 +2,12 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp_q_four_room"
+EXP_NAME="exp_five_q_four_room"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
-RECOVERY_TYPE="q"
+RECOVERY_TYPE="five_q"
 BC_CKPT="models/bc_policy_4room_10.pt"   # 跟剛剛存的一樣路徑
 
 # 檢查 session 是否已存在
