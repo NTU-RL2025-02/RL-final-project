@@ -6,7 +6,7 @@ EXP_NAME="exp_expert_medium_maze"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
-RECOVERY_TYPE="expert"
+RECOVERY_TYPE="q"
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -35,4 +35,6 @@ python3 scripts/run_thriftydagger.py \
 
 echo "Started tmux session: $SESSION_NAME"
 echo "Attach with: tmux attach -t $SESSION_NAME"
+
+# test QRecovery and FiveQRecovery for the first time
 
