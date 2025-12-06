@@ -533,7 +533,6 @@ def thrifty(
         logger.save_config(_locals)
     except TypeError as e:
         print(f"[Warning] Could not save config as JSON: {e}")
-    
 
     # ----------------------------------------------------------
     # 2. 裝置選擇與隨機種子
@@ -775,7 +774,7 @@ def thrifty(
         # --------------------------------------------------
         # 10-1. 線上資料收集（epoch 0 跳過，保留給純 Q-training）
         # --------------------------------------------------
-        ball_traj = [] # 用於紀錄球的軌跡
+        ball_traj = []  # 用於紀錄球的軌跡
         step_count = 0
         if epoch_idx == 0:
             step_count = obs_per_iter  # 不跑 while loop
@@ -911,7 +910,7 @@ def thrifty(
                 done_flags.append(done)
                 rew.append(int(s_flag))
                 ball_x, ball_y = o2[0], o2[1]
-                ball_traj.append([ball_x, ball_y]) #存入綠色球的軌跡
+                ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
 
                 o = o2
                 obs.append(o)
@@ -927,15 +926,19 @@ def thrifty(
             if done:
                 ep_num += 1
                 # === Save per-episode ball trajectory ===
-                csv_path = os.path.join(logger_kwargs["output_dir"],f"ball_traj_epoch{epoch_idx}_ep{ep_num}.csv")
+                csv_path = os.path.join(
+                    logger_kwargs["output_dir"],
+                    f"ball_traj_epoch{epoch_idx}_ep{ep_num}.csv",
+                )
                 with open(csv_path, "w", newline="") as f:
                     writer = csv.writer(f)
                     writer.writerow(["ball_x", "ball_y"])
                     writer.writerows(ball_traj)
-                print(f"[Saved] ball trajectory for epoch {epoch_idx}, episode {ep_num} -> {csv_path}")
+                print(
+                    f"[Saved] ball trajectory for epoch {epoch_idx}, episode {ep_num} -> {csv_path}"
+                )
                 # Reset for next episode
                 ball_traj = []
-
 
             total_env_interacts += ep_len
 
@@ -962,8 +965,6 @@ def thrifty(
                     "wb",
                 ),
             )
-            
-            
 
             # online 更新 switching thresholds
             if (

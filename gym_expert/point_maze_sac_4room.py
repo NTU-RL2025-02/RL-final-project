@@ -37,7 +37,11 @@ class CustomRewardFlattenObservation(FlattenObservation):
 
     def __init__(self, env, maze_map=None):
         super().__init__(env)
-        raw_maze_map = maze_map if maze_map is not None else getattr(self.env.unwrapped, "maze_map", None)
+        raw_maze_map = (
+            maze_map
+            if maze_map is not None
+            else getattr(self.env.unwrapped, "maze_map", None)
+        )
         self.maze_grid = self._normalize_maze_map(raw_maze_map)
         self.distance_field, self.goal_cells = self._compute_distance_field(
             self.maze_grid
@@ -261,7 +265,7 @@ if torch.cuda.is_available():
     print(f"GPU Device: {torch.cuda.get_device_name(0)}")
 print(f"Gymnasium Version: {safe_version('gymnasium')}")
 print(f"Numpy Version: {safe_version('numpy')}")
-print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}", flush = True)
+print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}", flush=True)
 
 RL_TYPE = "SAC"
 ENV_ID = "PointMaze_UMaze-v3"  # choose any PointMaze variant you prefer
@@ -271,8 +275,11 @@ MAZE_FILE = "maze_4room.txt"
 MAX_EPISODE_STEPS = 1_000  # allow longer rollouts per episode
 
 with open(MAZE_FILE) as file:
-    MAZE = [list(map(lambda x: int(x) if x in ["0", "1"] else x, line.split())) for line in file.readlines()]
-        
+    MAZE = [
+        list(map(lambda x: int(x) if x in ["0", "1"] else x, line.split()))
+        for line in file.readlines()
+    ]
+
 # Training/evaluation kwargs keep rendering off for speed; video env enables RGB frames.
 TRAIN_EVAL_ENV_KWARGS = {
     "render_mode": None,
@@ -397,7 +404,9 @@ def main() -> None:
     mean_reward, std_reward = evaluate_policy(
         model, env_val, n_eval_episodes=N_EVAL_EPISODES, deterministic=True
     )
-    print(f"Final model mean reward: {mean_reward:.2f} +/- {std_reward:.2f}", flush=True)
+    print(
+        f"Final model mean reward: {mean_reward:.2f} +/- {std_reward:.2f}", flush=True
+    )
 
     env.close()
     env_val.close()
@@ -485,8 +494,6 @@ def plot_learning_curve() -> None:
     plt.title(f"{RL_TYPE} on {ENV_ID}")
     plt.legend()
     plt.show()
-
-
 
 
 if __name__ == "__main__":
