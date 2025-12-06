@@ -26,7 +26,6 @@ python3 scripts/run_thriftydagger.py \
   --iters 100 \
   --targetrate 0.01 \
   --expert_policy_file models/best_model_4rooms \
-  --recovery_policy_file models/best_model_4rooms \
   --demonstration_set_file models/offline_dataset_4rooms_392.pkl \
   --max_expert_query 100000 \
   --environment 'PointMaze_4rooms-v3' \

@@ -72,7 +72,6 @@ def main(args):
             "environment": args.environment,
             "max_expert_query": args.max_expert_query,
             "expert_policy_file": args.expert_policy_file,
-            "recovery_policy_file": args.recovery_policy_file,
             "demonstration_set_file": args.demonstration_set_file,
             "recovery_type": args.recovery_type,
             # 新增：記錄 BC 相關設定
@@ -200,13 +199,6 @@ if __name__ == "__main__":
         type=str,
         default="models/best_model_mediumdense",
         help="filepath to expert model zip file",
-    )
-
-    parser.add_argument(
-        "--recovery_policy_file",
-        type=str,
-        default="models/best_model_mediumdense",
-        help="filepath to recovery model zip file",
     )
 
     parser.add_argument(
