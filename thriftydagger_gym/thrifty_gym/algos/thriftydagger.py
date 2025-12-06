@@ -158,13 +158,15 @@ def test_agent(
     obs_list, act_list, done_list, reward_list = [], [], [], []
 
     for episode_idx in range(num_test_episodes):
-
+        ball_traj = []  # 用於紀錄球的軌跡
         ep_ret, ep_ret2, ep_len = 0.0, 0.0, 0
         o, _ = env.reset()
         done = False
 
         while not done:
             obs_list.append(o)
+            ball_x, ball_y = o[0], o[1]
+            ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
 
             a = ac.act(o)
             a = np.clip(a, -act_limit, act_limit)
@@ -181,6 +183,19 @@ def test_agent(
             reward_list.append(int(success))
 
             ep_len += 1
+        csv_path = os.path.join(
+                    logger_kwargs["output_dir"],
+                    f"ball_traj_epoch{epoch_idx}_ep{ep_num}.csv",
+                )
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["ball_x", "ball_y"])
+            writer.writerows(ball_traj)
+        print(
+            f"[Saved] ball trajectory for epoch {epoch_idx}, episode {ep_num} -> {csv_path}"
+        )
+        # Reset for next episode
+        ball_traj = []
 
     success_rate = sum(reward_list) / num_test_episodes
     data = {
@@ -779,7 +794,6 @@ def thrifty(
         # --------------------------------------------------
         # 10-1. 線上資料收集（epoch 0 跳過，保留給純 Q-training）
         # --------------------------------------------------
-        ball_traj = []  # 用於紀錄球的軌跡
         step_count = 0
         if epoch_idx == 0:
             step_count = obs_per_iter  # 不跑 while loop
@@ -914,8 +928,7 @@ def thrifty(
 
                 done_flags.append(done)
                 rew.append(int(s_flag))
-                ball_x, ball_y = o2[0], o2[1]
-                ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
+                
 
                 o = o2
                 obs.append(o)
@@ -931,19 +944,7 @@ def thrifty(
             if done:
                 ep_num += 1
                 # === Save per-episode ball trajectory ===
-                csv_path = os.path.join(
-                    logger_kwargs["output_dir"],
-                    f"ball_traj_epoch{epoch_idx}_ep{ep_num}.csv",
-                )
-                with open(csv_path, "w", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["ball_x", "ball_y"])
-                    writer.writerows(ball_traj)
-                print(
-                    f"[Saved] ball trajectory for epoch {epoch_idx}, episode {ep_num} -> {csv_path}"
-                )
-                # Reset for next episode
-                ball_traj = []
+                
 
             total_env_interacts += ep_len
 
