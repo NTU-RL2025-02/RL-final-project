@@ -128,8 +128,6 @@ def main(args):
         recovery_policy = QRecovery(env.observation_space, env.action_space)
     elif args.recovery_type == "expert":
         recovery_policy = expert_pol
-    else:
-        raise NotImplementedError("This policy is not implemented in this script.")
 
     # ---- 主訓練流程 ----
     try:
@@ -213,7 +211,7 @@ if __name__ == "__main__":
         "--recovery_type",
         type=str,
         default="five_q",
-        choices=["five_q", "q"],
+        choices=["five_q", "q", "expert"],
         help="choose recovery policy variant",
     )
     parser.add_argument(

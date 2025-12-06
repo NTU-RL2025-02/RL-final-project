@@ -26,7 +26,7 @@ python3 scripts/run_thriftydagger.py \
   --expert_policy_file models/best_model_medium \
   --recovery_policy_file models/best_model_medium \
   --demonstration_set_file models/offline_dataset_mazeMedium_1000.pkl \
-  --max_expert_query 2000 \
+  --max_expert_query 50000 \
   --environment 'PointMaze_Medium-v3' \
   --recovery_type $RECOVERY_TYPE \
   --num_test_episodes 100 \
