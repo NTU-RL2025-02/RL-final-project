@@ -502,7 +502,7 @@ def thrifty(
     batch_size: int = 100,
     logger_kwargs: Dict[str, Any] = dict(),
     num_test_episodes: int = 10,
-    bc_epochs: int = 20,
+    bc_epochs: int = 5,
     input_file: str = "data.pkl",
     device_idx: int = 0,
     expert_policy: Optional[Any] = None,
