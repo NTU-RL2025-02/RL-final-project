@@ -108,8 +108,9 @@ def main(args):
             render_mode="human" if render else None,
         )
         env = FlattenObservation(env)
-        env = MazeWrapper(env)  # add success wrapper
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
+        env = MazeWrapper(env)  # add success wrapper
+        
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
 
