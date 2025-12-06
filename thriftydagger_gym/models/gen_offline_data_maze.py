@@ -10,8 +10,6 @@ The script defaults to loading `best_model_mediumdense.zip` (trained with SAC)
 and the continuous control environment `PointMaze_Medium-v3`.
 """
 
-from __future__ import annotations
-
 import argparse
 import pickle
 from pathlib import Path
