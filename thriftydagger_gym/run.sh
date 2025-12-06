@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp_q_medium_maze_use_bc_pretrained"
+EXP_NAME="exp_q_four_room_expert"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
@@ -25,15 +25,13 @@ python3 scripts/run_thriftydagger.py \
   --device 0 \
   --iters 100 \
   --targetrate 0.01 \
-  --expert_policy_file models/best_model_medium \
-  --recovery_policy_file models/best_model_medium \
-  --demonstration_set_file models/offline_dataset_mazeMedium_1000.pkl \
-  --max_expert_query 50000 \
-  --environment 'PointMaze_Medium-v3' \
+  --expert_policy_file models/best_model_4rooms \
+  --recovery_policy_file models/best_model_4rooms \
+  --demonstration_set_file models/offline_dataset_4rooms_392.pkl \
+  --max_expert_query 100000 \
+  --environment 'PointMaze_4rooms-v3' \
   --recovery_type $RECOVERY_TYPE \
   --num_test_episodes 100 \
-  --bc_checkpoint $BC_CKPT \
-  --skip_bc_pretrain \
   $BASENAME > output_$BASENAME.txt 2>&1
 "
 
