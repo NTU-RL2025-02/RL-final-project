@@ -20,6 +20,7 @@ import numpy as np
 from stable_baselines3 import SAC
 import gymnasium_robotics
 from gymnasium.wrappers import FlattenObservation
+from thrifty_gym.maze import FOUR_ROOMS_21x21, FOUR_ROOMS_21x21_random_start
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "offline_dataset_mazeMedium_1000.pkl",
+        default=root / "offline_dataset_4rooms_1000.pkl",
         help="Where to store the collected dataset (pickle).",
     )
     parser.add_argument(
@@ -147,8 +148,8 @@ def collect_rollouts(
         "obs": [],
         "act": [],
         "next_observations": [],
-        "rewards": [],
-        "dones": [],
+        "rew": [],
+        "done": [],
         "episode_starts": [],
     }
     all_returns: List[float] = []
@@ -164,8 +165,8 @@ def collect_rollouts(
             "obs": [],
             "act": [],
             "next_observations": [],
-            "rewards": [],
-            "dones": [],
+            "rew": [],
+            "done": [],
             "episode_starts": [],
         }
         ep_return = 0.0
@@ -192,8 +193,8 @@ def collect_rollouts(
             ep_data["obs"].append(obs)
             ep_data["act"].append(action)
             ep_data["next_observations"].append(next_obs)
-            ep_data["rewards"].append(reward)
-            ep_data["dones"].append(done_flag)
+            ep_data["rew"].append(reward)
+            ep_data["done"].append(done_flag)
             ep_data["episode_starts"].append(ep_len == 0)
 
             obs = next_obs
@@ -244,8 +245,8 @@ def collect_rollouts(
         "obs": np.asarray(data["obs"], dtype=np.float32),
         "act": np.asarray(data["act"], dtype=np.float32),
         "next_observations": np.asarray(data["next_observations"], dtype=np.float32),
-        "rewards": np.asarray(data["rewards"], dtype=np.float32),
-        "dones": np.asarray(data["dones"], dtype=bool),
+        "rew": np.asarray(data["rew"], dtype=np.float32),
+        "done": np.asarray(data["done"], dtype=bool),
         "episode_starts": np.asarray(data["episode_starts"], dtype=bool),
     }
 
@@ -256,7 +257,15 @@ def main() -> None:
     if not args.model.exists():
         raise FileNotFoundError(f"Model file not found: {args.model}")
 
-    env = FlattenObservation(gym.make(args.env_id))
+    env = FlattenObservation(
+        env=gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            maze_map=FOUR_ROOMS_21x21,
+            max_episode_steps=args.max_steps,
+        )
+    )
     env.action_space.seed(args.seed)
 
     model: SAC = SAC.load(str(args.model))
