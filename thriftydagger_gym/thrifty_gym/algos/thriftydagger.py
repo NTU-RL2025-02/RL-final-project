@@ -538,10 +538,10 @@ def thrifty(
     # ----------------------------------------------------------
     # 3. robosuite 設定與環境基本資訊
     # ----------------------------------------------------------
-    if robosuite:
+    # if robosuite:
         # 將 model.xml 存到 output_dir，方便之後 replay
-        with open(os.path.join(logger_kwargs["output_dir"], "model.xml"), "w") as fh:
-            fh.write(env.env.sim.model.get_xml())
+    with open(os.path.join(logger_kwargs["output_dir"], "model.xml"), "w") as fh:
+        fh.write(env.env.sim.model.get_xml())
 
     # 從環境取得 observation space / action space 維度
     obs_dim = env.observation_space.shape
@@ -755,8 +755,8 @@ def thrifty(
                 [],  # safety scores
             )
 
-            if robosuite:
-                simstates = [env.env.sim.get_state().flatten()]
+            # if robosuite:
+            simstates = [env.env.sim.get_state().flatten()]
 
             while step_count < obs_per_iter and not done:
                 a_robot = ac.act(o)
@@ -862,8 +862,8 @@ def thrifty(
                 o = o2
                 obs.append(o)
 
-                if robosuite:
-                    simstates.append(env.env.sim.get_state().flatten())
+                # if robosuite:
+                simstates.append(env.env.sim.get_state().flatten())
 
                 var.append(float(ac.variance(o)))
 
@@ -887,7 +887,7 @@ def thrifty(
                 "beta_R": switch2robot_thresh,
                 "eps_H": switch2human_thresh2,
                 "eps_R": switch2robot_thresh2,
-                "simstates": np.array(simstates) if robosuite else None,
+                "simstates": np.array(simstates) # if robosuite else None,
             }
             logging_data.append(episode_dict)
 
