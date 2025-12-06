@@ -78,6 +78,31 @@ def main(args):
     )
 
     # ---- 建 env ----
+    FOUR_ROOMS_21x21 = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",0,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"r","r","r","r","r","r","r","r","r",1,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",0,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,"g","g","g","g","g","g","g","g","g",1,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+]
+
+
     env = None
     if args.environment == "LunarLander-v3":
         env = gym.make(
@@ -106,6 +131,18 @@ def main(args):
             continuing_task=False,
             reset_target=False,
             render_mode="human" if render else None,
+        )
+        env = FlattenObservation(env)
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
+        env = MazeWrapper(env)  # add success wrapper
+
+    elif args.environment == "PointMaze_4rooms-v3":
+        env = gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
+            maze_map = FOUR_ROOMS_21x21
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
