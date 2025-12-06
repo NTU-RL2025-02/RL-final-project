@@ -131,11 +131,13 @@ class CustomRewardFlattenObservation(FlattenObservation):
         x, y = obs_dict["observation"][:2]
 
         i, j = self._world_to_cell(x, y)
+        success = False
 
         if reward_map[i][j] == "0":
             shaped_reward = -1.0
         elif reward_map[i][j] == "1":
             shaped_reward = 100.0
+            success = True
         elif reward_map[i][j] == "R":
             shaped_reward = v_x
         elif reward_map[i][j] == "L":
@@ -148,6 +150,10 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = 0.0
 
         shaped_reward = shaped_reward - 10
+
+        if success:
+            terminated = True
+            info["is_success"] = True
 
         flat_obs = self.observation(obs_dict)
         return flat_obs, shaped_reward, terminated, truncated, info
