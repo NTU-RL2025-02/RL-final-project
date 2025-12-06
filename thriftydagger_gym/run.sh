@@ -1,7 +1,7 @@
 #! /bin/bash
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
-EXP_NAME="expert_thriftydagger"
+EXP_NAME="1206_csv_test"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
