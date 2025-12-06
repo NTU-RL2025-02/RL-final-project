@@ -147,6 +147,8 @@ class CustomRewardFlattenObservation(FlattenObservation):
         else:
             shaped_reward = 0.0
 
+        shaped_reward = shaped_reward - 2
+
         flat_obs = self.observation(obs_dict)
         return flat_obs, shaped_reward, terminated, truncated, info
 
