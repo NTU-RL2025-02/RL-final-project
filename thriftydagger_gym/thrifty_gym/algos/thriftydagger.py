@@ -772,6 +772,9 @@ def thrifty(
     # ----------------------------------------------------------
     # 10. Main ThriftyDAgger Loop
     # ----------------------------------------------------------
+    best_success_rate = -1.0
+    best_model: Optional[Any] = None
+
     for epoch_idx in range(iters + 1):
         # --------------------------------------------------
         # 10-1. 線上資料收集（epoch 0 跳過，保留給純 Q-training）
@@ -1026,6 +1029,19 @@ def thrifty(
         )
         print("Epoch {}: Success Rate {:.3f}".format(epoch_idx, success_rate))
 
+        # 若成功率變好，更新 best model 並馬上存檔
+        if success_rate > best_success_rate:
+            best_success_rate = success_rate
+            best_model = deepcopy(ac)
+            ckpt_dir = logger_kwargs.get("output_dir", ".")
+            os.makedirs(ckpt_dir, exist_ok=True)
+            ckpt_path = os.path.join(ckpt_dir, "best_model.pt")
+
+            torch.save(best_model, ckpt_path)
+            print(
+                f"[Checkpoint] Success improved to {best_success_rate:.3f}, saved best model at {ckpt_path}"
+            )
+
         # --------------------------------------------------
         # 10-3. retrain Q-risk safety critic
         # --------------------------------------------------
@@ -1084,3 +1100,32 @@ def thrifty(
         if num_switch_to_human + num_switch_to_recovery >= max_expert_query:
             print("Reached max expert queries, stopping training.")
             break
+
+    # ------------------------------------------------------
+    # 11. 訓練結束後：用 best model 再 eval 並存最終模型
+    # ------------------------------------------------------
+    if best_model is not None:
+        ac_for_eval = best_model
+    else:
+        ac_for_eval = ac
+
+    if num_test_episodes > 0:
+        final_success_rate = test_agent(
+            env,
+            ac_for_eval,
+            num_test_episodes,
+            act_limit,
+            horizon,
+            robosuite,
+            logger_kwargs,
+            epoch=iters + 1,
+        )
+        print("Final Eval (Best Model): Success Rate {:.3f}".format(final_success_rate))
+
+    # 存最終模型（使用 best model 若有），固定檔名 final_model.pt
+    ckpt_dir = logger_kwargs.get("output_dir", ".")
+    os.makedirs(ckpt_dir, exist_ok=True)
+    save_path = os.path.join(ckpt_dir, "final_model.pt")
+
+    torch.save(ac_for_eval, save_path)
+    print(f"[Final Model] Saved final (best) model to {save_path}")
