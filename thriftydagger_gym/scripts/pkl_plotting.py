@@ -17,7 +17,7 @@ def load_rollouts(path: Path):
     if not isinstance(data, dict):
         raise TypeError(f"Expect dict in {path}, got {type(data)}")
 
-    required_keys = {"obs"}
+    required_keys = {"obs", "done"}
     if not required_keys.issubset(data.keys()):
         raise KeyError(f"pkl 檔缺少必要欄位: {required_keys - set(data.keys())}")
 
