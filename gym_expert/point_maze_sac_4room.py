@@ -6,6 +6,7 @@ checkpoint callbacks, best-model video recording, and performance plotting.
 
 import os
 import platform
+from collections import deque
 from importlib.metadata import version
 
 import gymnasium as gym
@@ -28,71 +29,90 @@ import matplotlib.pyplot as plt
 import tqdm
 
 
-class CustomRewardFlattenObservation(FlattenObservation):
-    """Flatten dict observations and do custom reward shaping."""
+class BFSRewardWrapper(FlattenObservation):
+    """Reward = -BFS grid distance to goal; BFS precomputed from 'g' cells."""
 
-    def __init__(self, env, step_penalty: float = 0.01, room_bonus: float = 1.0):
+    def __init__(self, env, maze_map, cell_size=None):
         super().__init__(env)
-        self.step_penalty = step_penalty
-        self.room_bonus = room_bonus
-        self.prev_room = None  # 記住上一個房間
+        self.grid = np.array(maze_map, dtype=object)  # 0=free, 1=wall, 'g'=goal
+        self.rows, self.cols = self.grid.shape
+
+        self.cell_size = cell_size or self._infer_cell_size()
+        self.origin_x = -(self.cols * self.cell_size) / 2.0 + self.cell_size / 2.0
+        self.origin_y = (self.rows * self.cell_size) / 2.0 - self.cell_size / 2.0
+
+        self.dist = self._bfs_from_goals()
 
     def reset(self, **kwargs):
-        # 先從原始 env 拿 dict obs
         obs_dict, info = self.env.reset(**kwargs)
-        # 取出位置 (x, y) —— 來自 observation 的前兩維
-        x, y = obs_dict["observation"][0], obs_dict["observation"][1]
-        self.prev_room = self._get_room_id(x, y)
-        # 再把 obs flatten 給 SB3 用
         flat_obs = self.observation(obs_dict)
         return flat_obs, info
 
     def step(self, action):
-        # 注意：這裡直接呼叫 self.env.step，拿 dict obs
         obs_dict, reward, terminated, truncated, info = self.env.step(action)
 
-        # 取目前位置
-        x, y = obs_dict["observation"][0], obs_dict["observation"][1]
-        current_room = self._get_room_id(x, y)
-        
+        x, y = obs_dict["observation"][:2]
+        r, c = self._world_to_cell(x, y)
+        if 0 <= r < self.rows and 0 <= c < self.cols:
+            d = self.dist[r, c]
+            shaped_reward = -float(d) if np.isfinite(d) else reward
+        else:
+            shaped_reward = reward
 
-        shaped_reward = reward
-
-        # 1. 每一個時間步給小 penalty
-        shaped_reward -= self.step_penalty
-
-        # 2. 如果跨房間，就加一個 bonus
-        if (
-            self.prev_room is not None
-            and current_room is not None
-            and current_room != self.prev_room
-        ):
-            shaped_reward += self.room_bonus
-
-        # 更新 prev_room
-        self.prev_room = current_room
-
-        # 最後 flatten obs 回傳給 SAC
         flat_obs = self.observation(obs_dict)
         return flat_obs, shaped_reward, terminated, truncated, info
 
-    def _get_room_id(self, x: float, y: float):
-        """
-        粗略用座標象限區分四個房間：
-        - y >= 0, x <= 0 → 左上
-        - y >= 0, x > 0  → 右上
-        - y < 0,  x <= 0 → 左下
-        - y < 0,  x > 0  → 右下
-        之後你如果知道實際牆的位置，可以再把 0 換成更精準的 threshold。
-        """
-        if y >= 0 and x <= 0:
-            return 0  # room 0
-        elif y >= 0 and x > 0:
-            return 1  # room 1
-        elif y < 0 and x <= 0:
-            return 2  # room 2
-        else:
-            return 3  # room 3
+    # ---------- helpers ----------
+
+    def _bfs_from_goals(self):
+        dist = np.full((self.rows, self.cols), np.inf, dtype=np.float32)
+        q = deque()
+
+        # 找出所有 goal cell
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if isinstance(self.grid[r, c], str) and self.grid[r, c].lower() == "g":
+                    dist[r, c] = 0.0
+                    q.append((r, c))
+
+        # 如果你只有一個 g，也沒差；多個 g 就多個終點
+        dirs = [(1,0), (-1,0), (0,1), (0,-1)]
+        while q:
+            r, c = q.popleft()
+            for dr, dc in dirs:
+                nr, nc = r+dr, c+dc
+                if 0 <= nr < self.rows and 0 <= nc < self.cols:
+                    if self.grid[nr, nc] != 1 and dist[nr, nc] > dist[r, c] + 1:
+                        dist[nr, nc] = dist[r, c] + 1
+                        q.append((nr, nc))
+        return dist
+
+    def _world_to_cell(self, x, y):
+        # 反過來算落在哪一格
+        col = int((x - self.origin_x) / self.cell_size)
+        row = int((self.origin_y - y) / self.cell_size)
+        return row, col
+
+    def _infer_cell_size(self):
+        base = self._unwrap_env(self.env)
+        for attr in ["maze_size_scaling", "_maze_size_scaling"]:
+            val = getattr(base, attr, None)
+            if val is not None:
+                return float(val)
+        maze = getattr(base, "maze", None)
+        if maze is not None:
+            for attr in ["maze_size_scaling", "_maze_size_scaling"]:
+                val = getattr(maze, attr, None)
+                if val is not None:
+                    return float(val)
+        return 1.0
+
+    @staticmethod
+    def _unwrap_env(env):
+        base = env
+        while hasattr(base, "env"):
+            base = base.env
+        return base
 
 
 def safe_version(pkg: str) -> str:
@@ -118,15 +138,22 @@ ENV_ID = "PointMaze_UMaze-v3"  # choose any PointMaze variant you prefer
 LOG_DIR = os.path.join("./logs", ENV_ID)
 NAME_PREFIX = "point_maze_sac"
 MAZE_FILE = "maze_4room.txt"
-STEP_PENALTY = 0.01  # small penalty per step to encourage faster solutions
-ROOM_BONUS = 1.0    # bonus for entering a new room
+MAX_EPISODE_STEPS = 1_000  # allow longer rollouts per episode
 
 with open(MAZE_FILE) as file:
     MAZE = [list(map(lambda x: int(x) if x in ["0", "1"] else x, line.split())) for line in file.readlines()]
         
 # Training/evaluation kwargs keep rendering off for speed; video env enables RGB frames.
-TRAIN_EVAL_ENV_KWARGS = {"render_mode": None, 'maze_map': MAZE}
-VIDEO_ENV_KWARGS = {"render_mode": "rgb_array", "maze_map": MAZE}
+TRAIN_EVAL_ENV_KWARGS = {
+    "render_mode": None,
+    "maze_map": MAZE,
+    "max_episode_steps": MAX_EPISODE_STEPS,
+}
+VIDEO_ENV_KWARGS = {
+    "render_mode": "rgb_array",
+    "maze_map": MAZE,
+    "max_episode_steps": MAX_EPISODE_STEPS,
+}
 
 # Vector env settings
 N_ENVS = 16
@@ -140,6 +167,9 @@ VIDEO_RECORD_FREQ = 50_000
 
 # Total training steps; Point Maze is sparse so budget generously for expert-quality policy.
 TOTAL_TIMESTEPS = 1_200_000
+
+# Visual settings
+VIDEO_CAMERA_DISTANCE_SCALE = 3.2  # lift camera higher for clearer recordings
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -169,10 +199,9 @@ class PeriodicVideoRecorder(BaseCallback):
 
 def main() -> None:
     # Inspect the observation/action spaces after flattening the dict observation.
-    sample_env = CustomRewardFlattenObservation(
+    sample_env = BFSRewardWrapper(
         gym.make(ENV_ID, **TRAIN_EVAL_ENV_KWARGS),
-        step_penalty=STEP_PENALTY,
-        room_bonus=ROOM_BONUS,
+        maze_map=MAZE,
     )
     print("Observation Space:", sample_env.observation_space)
     print("Action Space:", sample_env.action_space, flush=True)
@@ -183,16 +212,16 @@ def main() -> None:
         ENV_ID,
         n_envs=N_ENVS,
         seed=0,
-        wrapper_class=CustomRewardFlattenObservation,
-        wrapper_kwargs={"step_penalty": STEP_PENALTY, "room_bonus": ROOM_BONUS},
+        wrapper_class=BFSRewardWrapper,
+        wrapper_kwargs={"maze_map": MAZE},
         env_kwargs=TRAIN_EVAL_ENV_KWARGS,
     )
     env_val = make_vec_env(
         ENV_ID,
         n_envs=EVAL_ENVS,
         seed=1,
-        wrapper_class=CustomRewardFlattenObservation,
-        wrapper_kwargs={"step_penalty": STEP_PENALTY, "room_bonus": ROOM_BONUS},
+        wrapper_class=BFSRewardWrapper,
+        wrapper_kwargs={"maze_map": MAZE},
         env_kwargs=TRAIN_EVAL_ENV_KWARGS,
     )
 
@@ -248,8 +277,8 @@ def main() -> None:
         ENV_ID,
         n_envs=EVAL_ENVS,
         seed=2,
-        wrapper_class=CustomRewardFlattenObservation,
-        wrapper_kwargs={"step_penalty": STEP_PENALTY, "room_bonus": ROOM_BONUS},
+        wrapper_class=BFSRewardWrapper,
+        wrapper_kwargs={"maze_map": MAZE},
         env_kwargs=TRAIN_EVAL_ENV_KWARGS,
     )
     best_model_path = os.path.join(LOG_DIR, "best_model.zip")
@@ -272,8 +301,6 @@ def record_video(
     name_prefix: str = NAME_PREFIX,
     video_length: int = 1_000,
     env_kwargs=None,
-    step_penalty: float = STEP_PENALTY,
-    room_bonus: float = ROOM_BONUS,
 ) -> None:
     """Record a short rollout of the model to LOG_DIR."""
     env_kwargs = env_kwargs or VIDEO_ENV_KWARGS
@@ -281,8 +308,8 @@ def record_video(
         ENV_ID,
         n_envs=1,
         seed=42,
-        wrapper_class=CustomRewardFlattenObservation,
-        wrapper_kwargs={"step_penalty": step_penalty, "room_bonus": room_bonus},
+        wrapper_class=BFSRewardWrapper,
+        wrapper_kwargs={"maze_map": MAZE},
         env_kwargs=env_kwargs,
     )
     env = VecVideoRecorder(
@@ -328,6 +355,8 @@ def plot_learning_curve() -> None:
     plt.title(f"{RL_TYPE} on {ENV_ID}")
     plt.legend()
     plt.show()
+
+
 
 
 if __name__ == "__main__":
