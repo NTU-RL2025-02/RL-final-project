@@ -43,7 +43,7 @@ if torch.cuda.is_available():
     print(f"GPU Device: {torch.cuda.get_device_name(0)}")
 print(f"Gymnasium Version: {safe_version('gymnasium')}")
 print(f"Numpy Version: {safe_version('numpy')}")
-print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}")
+print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}", flush = True)
 
 RL_TYPE = "SAC"
 ENV_ID = "PointMaze_UMaze-v3"  # choose any PointMaze variant you prefer
@@ -59,7 +59,7 @@ TRAIN_EVAL_ENV_KWARGS = {"render_mode": None, 'maze_map': MAZE}
 VIDEO_ENV_KWARGS = {"render_mode": "rgb_array"}
 
 # Vector env settings
-N_ENVS = 4
+N_ENVS = 16
 EVAL_ENVS = 1
 
 # Evaluation callback frequency (timesteps) and evaluation episodes
@@ -76,7 +76,7 @@ def main() -> None:
     # Inspect the observation/action spaces after flattening the dict observation.
     sample_env = FlattenObservation(gym.make(ENV_ID, **TRAIN_EVAL_ENV_KWARGS))
     print("Observation Space:", sample_env.observation_space)
-    print("Action Space:", sample_env.action_space)
+    print("Action Space:", sample_env.action_space, flush=True)
     sample_env.close()
 
     # Training and evaluation environments (vectorized).
@@ -135,7 +135,7 @@ def main() -> None:
     mean_reward, std_reward = evaluate_policy(
         model, env_val, n_eval_episodes=N_EVAL_EPISODES, deterministic=True
     )
-    print(f"Final model mean reward: {mean_reward:.2f} +/- {std_reward:.2f}")
+    print(f"Final model mean reward: {mean_reward:.2f} +/- {std_reward:.2f}", flush=True)
 
     env.close()
     env_val.close()
