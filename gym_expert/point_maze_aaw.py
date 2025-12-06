@@ -127,7 +127,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
 
     def step(self, action):
         obs_dict, reward, terminated, truncated, info = self.env.step(action)
-        v_x, v_y = action[:, 0], action[:, 1]
+        v_x, v_y = action[0], action[1]
         x, y = obs_dict["observation"][:2]
 
         i, j = self._world_to_cell(x, y)
