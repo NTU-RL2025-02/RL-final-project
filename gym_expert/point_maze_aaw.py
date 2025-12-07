@@ -121,10 +121,16 @@ class CustomRewardFlattenObservation(FlattenObservation):
         self._xy_to_rowcol_fn = self._extract_xy_to_rowcol_fn()
         grid = np.array(self.maze_grid, copy=False)
         self.maze = grid == 1
+        self._wall_indices = np.argwhere(self.maze) if self.maze is not None else None
+        self._wall_rects_cell_size = None
+        self._wall_x_min = self._wall_x_max = None
+        self._wall_y_min = self._wall_y_max = None
+        self._prepare_wall_rects()
 
     def reset(self, **kwargs):
         obs_dict, info = self.env.reset(**kwargs)
         self._maybe_calibrate_cell_size(obs_dict)
+        self._prepare_wall_rects()
         flat_obs = self.observation(obs_dict)
         return flat_obs, info
 
@@ -161,10 +167,10 @@ class CustomRewardFlattenObservation(FlattenObservation):
                 truncated = True
 
         if hit_wall:
-            shaped_reward = -150.0
+            shaped_reward = -100
             # print("Hit wall penalty applied.")
         else:
-            shaped_reward = 10 * shaped_reward - 15
+            shaped_reward = 10 * shaped_reward - 16
 
         if success:
             terminated = True
@@ -182,38 +188,16 @@ class CustomRewardFlattenObservation(FlattenObservation):
         if walls is None:
             return math.inf
 
-        wall_indices = np.argwhere(walls)
-        if wall_indices.size == 0:
+        if self._wall_indices is None or self._wall_indices.size == 0:
             return math.inf
 
-        cell_size = self._cell_size or 1.0
-        half = cell_size / 2.0
-        min_dist = math.inf
-
-        for i, j in wall_indices:
-            cx, cy = self._cell_center_from_grid(i, j, cell_size=cell_size)
-            x_min, x_max = cx - half, cx + half
-            y_min, y_max = cy - half, cy + half
-
-            if x < x_min:
-                dx = x_min - x
-            elif x > x_max:
-                dx = x - x_max
-            else:
-                dx = 0.0
-
-            if y < y_min:
-                dy = y_min - y
-            elif y > y_max:
-                dy = y - y_max
-            else:
-                dy = 0.0
-
-            dist = math.hypot(dx, dy)
-            if dist < min_dist:
-                min_dist = dist
-
-        return min_dist
+        self._prepare_wall_rects()
+        dx = np.where(x < self._wall_x_min, self._wall_x_min - x, 0.0)
+        dx = np.where(x > self._wall_x_max, x - self._wall_x_max, dx)
+        dy = np.where(y < self._wall_y_min, self._wall_y_min - y, 0.0)
+        dy = np.where(y > self._wall_y_max, y - self._wall_y_max, dy)
+        dist = np.hypot(dx, dy)
+        return float(dist.min()) if dist.size else math.inf
 
 
     # ----- distance helpers -----
@@ -369,6 +353,29 @@ class CustomRewardFlattenObservation(FlattenObservation):
         return base
 
     # ----- utilities -----
+    def _prepare_wall_rects(self):
+        """Precompute wall rectangle bounds for fast distance queries."""
+        if self.maze is None or self._wall_indices is None:
+            return
+        cell_size = self._cell_size or 1.0
+        if self._wall_rects_cell_size is not None and abs(
+            self._wall_rects_cell_size - cell_size
+        ) < 1e-6:
+            return  # already built for this cell size
+
+        half = cell_size / 2.0
+        centers = np.array(
+            [
+                self._cell_center_from_grid(int(r), int(c), cell_size=cell_size)
+                for r, c in self._wall_indices
+            ]
+        )
+        self._wall_x_min = centers[:, 0] - half
+        self._wall_x_max = centers[:, 0] + half
+        self._wall_y_min = centers[:, 1] - half
+        self._wall_y_max = centers[:, 1] + half
+        self._wall_rects_cell_size = cell_size
+
     @staticmethod
     def _normalize_maze_map(maze_map):
         if maze_map is None:
