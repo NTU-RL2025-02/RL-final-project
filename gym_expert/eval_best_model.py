@@ -21,7 +21,7 @@ DEFAULT_MODEL_PATH = Path("logs/PointMaze_UMaze-v3/best_model.zip")
 DEFAULT_ENV_ID = "PointMaze_UMaze-v3"
 DEFAULT_EPISODES = 20
 DEFAULT_MAZE_FILE = Path("maze_4room.txt")
-DEFAULT_MAX_STEPS = 1500
+DEFAULT_MAX_STEPS = 1300
 
 
 def parse_args() -> argparse.Namespace:
