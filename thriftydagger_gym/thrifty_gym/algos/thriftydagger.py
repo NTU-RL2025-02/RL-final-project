@@ -433,7 +433,8 @@ def log_epoch(
     success_rate: int,
     total_env_interacts: int,
     online_burden: int,
-    num_switch_to_human: int,
+    num_switch_to_novel: int,
+    num_switch_to_exp: int,
     num_switch_to_recovery: int,
     num_switch_to_robot: int,
     loss_pi: Optional[float],
@@ -462,7 +463,8 @@ def log_epoch(
     print("TotalEnvInteracts", total_env_interacts)
     print("SuccessRate", success_rate)
     print("OnlineBurden", online_burden)
-    print("NumSwitchToNov", num_switch_to_human)
+    print("NumSwitchToNov", num_switch_to_novel)
+    print("NumSwitchToExpert", num_switch_to_exp)
     print("NumSwitchToRisk", num_switch_to_recovery)
     print("NumSwitchBack", num_switch_to_robot, flush=True)
 
@@ -472,7 +474,8 @@ def log_epoch(
     logger.log_tabular("TotalEpisodes", ep_num)
     logger.log_tabular("TotalEnvInteracts", total_env_interacts)
     logger.log_tabular("SuccessRate", success_rate)
-    logger.log_tabular("NumSwitchToNov", num_switch_to_human)
+    logger.log_tabular("NumSwitchToNov", num_switch_to_novel)
+    logger.log_tabular("NumSwitchToExpert", num_switch_to_exp)
     logger.log_tabular("NumSwitchToRisk", num_switch_to_recovery)
     logger.log_tabular("NumSwitchBack", num_switch_to_robot)
     logger.log_tabular("OnlineBurden", online_burden)
@@ -779,7 +782,8 @@ def thrifty(
     ep_num = 0  # 總 episode 數
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
-    num_switch_to_human = 0  # 因 novelty 切到 human 次數
+    num_switch_to_novel = 0  # 因 novelty 切到 human 次數
+    num_switch_to_exp = 0
     num_switch_to_recovery = 0  # 因 risk 切到 human 次數
     num_switch_to_robot = 0  # 從 human/recovery 切回 robot 次數
 
@@ -850,7 +854,8 @@ def thrifty(
                 # --------------------------------------------------
                 if not expert_mode and ac.variance(o) > switch2human_thresh:
                     print("Switch to Expert (Novel)")
-                    num_switch_to_human += 1
+                    num_switch_to_novel += 1
+                    num_switch_to_exp += 1
                     expert_mode = True
 
                 elif (
@@ -859,6 +864,8 @@ def thrifty(
                 ):
                     print("Switch to Recovery (Risk)")
                     num_switch_to_recovery += 1
+                    if recovery_type.lower() == "expert":
+                        num_switch_to_exp += 1
                     safety_mode = True
 
                 # --------------------------------------------------
@@ -1081,7 +1088,8 @@ def thrifty(
             success_rate=success_rate,
             total_env_interacts=total_env_interacts,
             online_burden=online_burden,
-            num_switch_to_human=num_switch_to_human,
+            num_switch_to_novel=num_switch_to_novel,
+            num_switch_to_exp=num_switch_to_exp,
             num_switch_to_recovery=num_switch_to_recovery,
             num_switch_to_robot=num_switch_to_robot,
             loss_pi=avg_loss_pi,
@@ -1095,7 +1103,7 @@ def thrifty(
         # --------------------------------------------------
         # 10-5. 早停條件：supervisor label 達上限
         # --------------------------------------------------
-        if num_switch_to_human + num_switch_to_recovery >= max_expert_query:
+        if num_switch_to_exp >= max_expert_query:
             print("Reached max expert queries, stopping training.")
             break
 
