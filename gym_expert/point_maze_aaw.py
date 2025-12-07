@@ -164,7 +164,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
         slowdown_penalty = 0.0
         cell_size = self._cell_size or 1.0
         agent_radius = 0.25 * cell_size  # PointMaze puck radius is about 0.2; keep margin.
-        stop_threshold = agent_radius + 0.1 * cell_size
+        stop_threshold = agent_radius
         slowdown_threshold = stop_threshold + 0.6 * cell_size  # start braking before a hairpin turn.
         if self.maze is not None:
             dist = self.nearest_wall_distance(self.maze, x, y, self.env)
