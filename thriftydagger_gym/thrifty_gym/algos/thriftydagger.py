@@ -145,7 +145,6 @@ def test_agent(
     robosuite: bool,
     logger_kwargs: Dict[str, Any],
     epoch: int = 0,
-    hdf5_trajectories_file: h5py.File = None,
 ) -> float:
     """
     使用目前 policy `ac` 在環境中跑 `num_test_episodes` 回合（不做 intervention），
@@ -186,13 +185,13 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
-
-        hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/x"] = (
-            np.array(ball_x)
-        )
-        hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/y"] = (
-            np.array(ball_y)
-        )
+        with h5py.File(os.path.join(logger_kwargs["output_dir"], "trajectories.hdf5",), "w") as hdf5_trajectories_file:
+            hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/x"] = (
+                np.array(ball_x)
+            )
+            hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/y"] = (
+                np.array(ball_y)
+            )
         print(
             f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
         )
@@ -524,7 +523,6 @@ def thrifty(
     bc_checkpoint: Optional[str] = None,
     save_bc_checkpoint: Optional[str] = None,
     skip_bc_pretrain: bool = False,
-    hdf5_trajectories_file: h5py.File = None,
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -668,7 +666,7 @@ def thrifty(
             horizon,
             robosuite,
             logger_kwargs,
-            epoch=0,
+            epoch=0
         )
         print("Final Success Rate:", success_rate)
         sys.exit(0)
@@ -978,10 +976,11 @@ def thrifty(
                     "wb",
                 ),
             )
-            hdf5_trajectories_file[f"training/episode{ep_num}/position"] = np.array(
-                obs
-            )[:, 0:2]
-            hdf5_trajectories_file[f"training/episode{ep_num}/policy"] = np.array(sup)
+            with h5py.File(os.path.join(logger_kwargs["output_dir"], "trajectories.hdf5",), "w") as hdf5_trajectories_file:
+                hdf5_trajectories_file[f"training/episode{ep_num}/position"] = np.array(
+                    obs
+                )[:, 0:2]
+                hdf5_trajectories_file[f"training/episode{ep_num}/policy"] = np.array(sup)
 
             # online 更新 switching thresholds
             if (
@@ -1037,7 +1036,7 @@ def thrifty(
             horizon,
             robosuite,
             logger_kwargs,
-            epoch=epoch_idx,
+            epoch=epoch_idx
         )
         print("Epoch {}: Success Rate {:.3f}".format(epoch_idx, success_rate))
 
@@ -1131,7 +1130,7 @@ def thrifty(
             horizon,
             robosuite,
             logger_kwargs,
-            epoch=iters + 1,
+            epoch=iters + 1
         )
         print("Final Eval (Best Model): Success Rate {:.3f}".format(final_success_rate))
 
