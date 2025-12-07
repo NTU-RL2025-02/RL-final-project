@@ -185,7 +185,7 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
-        with h5py.File(os.path.join(logger_kwargs["output_dir"], "trajectories.hdf5",), "a") as hdf5_trajectories_file:
+        with h5py.File(os.path.join(logger_kwargs["output_dir"], f"epoch{epoch}_trajectories.hdf5",), "a") as hdf5_trajectories_file:
             hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/x"] = (
                 np.array(ball_x)
             )
@@ -976,7 +976,7 @@ def thrifty(
                     "wb",
                 ),
             )
-            with h5py.File(os.path.join(logger_kwargs["output_dir"], "trajectories.hdf5",), "a") as hdf5_trajectories_file:
+            with h5py.File(os.path.join(logger_kwargs["output_dir"], f"epoch{epoch_idx}_trajectories.hdf5",), "a") as hdf5_trajectories_file:
                 hdf5_trajectories_file[f"training/episode{ep_num}/position"] = np.array(
                     obs
                 )[:, 0:2]

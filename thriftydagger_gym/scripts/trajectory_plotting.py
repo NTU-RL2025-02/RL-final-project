@@ -68,13 +68,14 @@ def load_hdf5_trajectories(
     episode_obs, policy_using = [], []
     with h5py.File(path, "r") as f:
         if hdf5_training_traj:
-            for traj in f["training"]:
-                episode_obs.append(traj["position"])
-                policy_using.append(traj["policy"])
+            for ep in f["training"]:
+                episode_obs.append(f[f"training/{ep}/position"])
+                policy_using.append(f[f"training/{ep}/policy"])
         if hdf5_testing_traj:
-            for traj in f["testing"]:
-                episode_obs.append(traj["position"])
+            for ep in f["testing"]:
+                episode_obs.append(f[f"testing/{ep}/position"])
                 policy_using.append(None)
+        
     return np.array(episode_obs), policy_using
 
 
@@ -225,21 +226,21 @@ if __name__ == "__main__":
     )
 
     # argument for hdf5 trajectory input
+    parser.set_defaults(hdf5_training_traj=False)
     parser.add_argument(
         "--hdf5_training_traj",
         action="store_true",
-        dest="render",
+        dest="hdf5_training_traj",
         help="If using hdf5 file as input, then enable training trajectory observation.",
     )
-    parser.set_defaults(hdf5_training_traj=False)
 
+    parser.set_defaults(hdf5_testing_traj=False)
     parser.add_argument(
         "--hdf5_testing_traj",
         action="store_true",
-        dest="render",
+        dest="hdf5_testing_traj",
         help="If using hdf5 file as input, then enable training trajectory observation.",
     )
-    parser.set_defaults(hdf5_testing_traj=False)
 
     args = parser.parse_args()
     main(
