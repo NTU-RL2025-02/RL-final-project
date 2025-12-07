@@ -20,7 +20,7 @@ import numpy as np
 from stable_baselines3 import SAC
 import gymnasium_robotics
 from gymnasium.wrappers import FlattenObservation
-from thrifty_gym.maze import FOUR_ROOMS_21x21, FOUR_ROOMS_21x21_random_start
+from thrifty_gym.maze import FOUR_ROOMS_ANGLE, FOUR_ROOMS_ANGLE_RANDOM_START
 
 
 def parse_args() -> argparse.Namespace:
@@ -262,7 +262,7 @@ def main() -> None:
             "PointMaze_Medium-v3",
             continuing_task=False,
             reset_target=False,
-            maze_map=FOUR_ROOMS_21x21,
+            maze_map=FOUR_ROOMS_ANGLE,
             max_episode_steps=args.max_steps,
         )
     )

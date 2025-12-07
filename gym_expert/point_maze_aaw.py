@@ -53,7 +53,7 @@ LOG_DIR = os.path.join("./logs", ENV_ID)
 NAME_PREFIX = "point_maze_sac"
 MAZE_FILE = "maze_4room.txt"
 REWARD_FILE = "maze_4room_reward.txt"
-MAX_EPISODE_STEPS = 1_000  # allow longer rollouts per episode
+MAX_EPISODE_STEPS = 800  # allow longer rollouts per episode
 
 with open(MAZE_FILE) as file:
     MAZE = [
@@ -136,16 +136,16 @@ class CustomRewardFlattenObservation(FlattenObservation):
         if reward_map[i][j] == "0":
             shaped_reward = -1.0
         elif reward_map[i][j] == "1":
-            shaped_reward = 100.0
+            shaped_reward = 20000.0
             success = True
         elif reward_map[i][j] == "R":
-            shaped_reward = v_x
+            shaped_reward = v_x / np.linalg.norm([v_x, v_y] + 1e-8)
         elif reward_map[i][j] == "L":
-            shaped_reward = -v_x
+            shaped_reward = -v_x / np.linalg.norm([v_x, v_y] + 1e-8)
         elif reward_map[i][j] == "U":
-            shaped_reward = v_y
+            shaped_reward = v_y / np.linalg.norm([v_x, v_y] + 1e-8)
         elif reward_map[i][j] == "D":
-            shaped_reward = -v_y
+            shaped_reward = -v_y / np.linalg.norm([v_x, v_y] + 1e-8)
         else:
             shaped_reward = 0.0
 

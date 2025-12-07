@@ -22,7 +22,7 @@ from thrifty_gym.utils.wrappers import (
     NoisyActionWrapper,
 )
 from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery, ExpertAsRecovery
-from thrifty_gym.maze import FOUR_ROOMS_21x21
+from thrifty_gym.maze import FOUR_ROOMS_ANGLE
 
 import gymnasium as gym
 import gymnasium_robotics
@@ -121,7 +121,7 @@ def main(args):
             continuing_task=False,
             reset_target=False,
             render_mode="human" if render else None,
-            maze_map=FOUR_ROOMS_21x21,
+            maze_map=FOUR_ROOMS_ANGLE,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)

@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from thrifty_gym.maze import FOUR_ROOMS_21x21
+from thrifty_gym.maze import FOUR_ROOMS_21x21, FOUR_ROOMS_ANGLE
 from gymnasium_robotics.envs.maze.maps import MEDIUM_MAZE
 
 
@@ -81,7 +81,7 @@ def main(
 
     # 3. 畫迷宮牆
     if maze_layout == "four_rooms":
-        maze = FOUR_ROOMS_21x21
+        maze = FOUR_ROOMS_ANGLE
     elif maze_layout == "medium":
         maze = MEDIUM_MAZE
     else:
