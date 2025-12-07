@@ -170,7 +170,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = -100
             # print("Hit wall penalty applied.")
         else:
-            shaped_reward = 10 * shaped_reward - 16
+            shaped_reward = 1 * shaped_reward - 1
 
         if success:
             terminated = True
@@ -499,7 +499,7 @@ def main() -> None:
         save_path=os.path.join(LOG_DIR, "checkpoint"),
     )
 
-    video_callback = PeriodicVideoRecorder(record_freq=VIDEO_RECORD_FREQ)
+    # video_callback = PeriodicVideoRecorder(record_freq=VIDEO_RECORD_FREQ)
 
     callback_list = CallbackList([checkpoint_callback, eval_callback, video_callback])
 
