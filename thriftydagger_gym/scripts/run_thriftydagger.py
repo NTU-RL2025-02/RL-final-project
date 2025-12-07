@@ -162,10 +162,10 @@ def main(args):
         thrifty(
             env=env,
             iters=args.iters,
+            seed=args.seed,
             logger_kwargs=logger_kwargs,
             device_idx=args.device,
             target_rate=args.targetrate,
-            seed=args.seed,
             expert_policy=expert_pol,
             recovery_policy=recovery_policy,
             input_file=args.demonstration_set_file,
@@ -175,10 +175,10 @@ def main(args):
             max_expert_query=args.max_expert_query,
             recovery_type=args.recovery_type,
             num_test_episodes=args.num_test_episodes,
-            # 新增：把 BC 相關參數傳給 thrifty
             bc_checkpoint=args.bc_checkpoint,
             save_bc_checkpoint=args.save_bc_checkpoint,
             skip_bc_pretrain=args.skip_bc_pretrain,
+            fix_thresholds=args.fix_thresholds,
         )
     except Exception:
         wandb.finish(exit_code=1)

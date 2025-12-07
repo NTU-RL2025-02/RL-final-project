@@ -518,7 +518,6 @@ def thrifty(
     recovery_type: str = "five_q",
     recovery_kwargs: Dict[str, Any] = dict(),
     fix_thresholds: bool = False,
-    # ------- 新增：BC checkpoint 相關參數 -------
     bc_checkpoint: Optional[str] = None,
     save_bc_checkpoint: Optional[str] = None,
     skip_bc_pretrain: bool = False,
