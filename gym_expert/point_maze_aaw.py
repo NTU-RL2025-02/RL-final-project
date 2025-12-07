@@ -158,26 +158,31 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = -v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)  - a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
         else:
             shaped_reward = 0.0
+
         hit_wall = False
-        proximity_penalty = 0
+        proximity_penalty = 0.0
+        slowdown_penalty = 0.0
+        cell_size = self._cell_size or 1.0
+        agent_radius = 0.25 * cell_size  # PointMaze puck radius is about 0.2; keep margin.
+        stop_threshold = agent_radius + 0.1 * cell_size
+        slowdown_threshold = stop_threshold + 0.6 * cell_size  # start braking before a hairpin turn.
         if self.maze is not None:
             dist = self.nearest_wall_distance(self.maze, x, y, self.env)
 
-            if dist < 0.1:
-                # 真正撞牆：給一個固定懲罰並截斷 episode
+            if dist < stop_threshold:
                 hit_wall = True
                 info["touched_wall"] = True
                 truncated = True
-                
-            elif dist < 2:
-                proximity_penalty = 100 * (2 - dist)
-
+            elif dist < slowdown_threshold:
+                gap = slowdown_threshold - dist
+                proximity_penalty = 8.0 * (gap / slowdown_threshold) ** 2  # smooth, bounded penalty
+                speed = np.linalg.norm([v_x, v_y])
+                slowdown_penalty = 0.05 * speed  # discourage carrying speed into tight corners
 
         if hit_wall:
-            shaped_reward = -100
-            # print("Hit wall penalty applied.")
+            shaped_reward = -100.0
         else:
-            shaped_reward = 2 * shaped_reward - 1 - proximity_penalty
+            shaped_reward = 2 * shaped_reward - 1 - proximity_penalty - slowdown_penalty
 
         if success:
             terminated = True
