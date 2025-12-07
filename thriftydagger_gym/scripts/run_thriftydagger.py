@@ -126,7 +126,7 @@ def main(args):
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env)  # add success wrapper
+        env = MazeWrapper(env, FOUR_ROOMS_ANGLE)  # add success wrapper
 
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
