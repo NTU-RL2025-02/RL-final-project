@@ -9,7 +9,7 @@ import itertools
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
-import csv
+import h5py
 
 import numpy as np
 import torch
@@ -144,7 +144,8 @@ def test_agent(
     horizon: int,
     robosuite: bool,
     logger_kwargs: Dict[str, Any],
-    epoch: int = 0,
+    epoch: int = 0, 
+    hdf5_trajectories_file: h5py.File = None
 ) -> float:
     """
     使用目前 policy `ac` 在環境中跑 `num_test_episodes` 回合（不做 intervention），
@@ -154,6 +155,7 @@ def test_agent(
     """
     if num_test_episodes <= 0:
         return
+
 
     obs_list, act_list, done_list, reward_list = [], [], [], []
 
@@ -183,17 +185,13 @@ def test_agent(
             reward_list.append(int(success))
 
             ep_len += 1
-
-        csv_path = os.path.join(
-            logger_kwargs["output_dir"],
-            f"ball_traj_epoch{epoch}_ep{episode_idx}.csv",
-        )
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["ball_x", "ball_y"])
-            writer.writerows(ball_traj)
+        ball_x, ball_y = o[0], o[1]
+        ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
+        
+        hdf5_trajectories_file[f'testing/epoch{epoch}/episode{episode_idx}/obs/x'] = np.array(ball_x)
+        hdf5_trajectories_file[f'testing/epoch{epoch}/episode{episode_idx}/obs/y'] = np.array(ball_y)
         print(
-            f"[Saved] ball trajectory for epoch {epoch}, episode {episode_idx} -> {csv_path}"
+            f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
         )
 
     success_rate = sum(reward_list) / num_test_episodes
@@ -524,6 +522,7 @@ def thrifty(
     bc_checkpoint: Optional[str] = None,
     save_bc_checkpoint: Optional[str] = None,
     skip_bc_pretrain: bool = False,
+    hdf5_trajectories_file: h5py.File = None, 
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -541,7 +540,7 @@ def thrifty(
             "Please use only one of them to initialize the policy."
         )
     # ----------------------------------------------------------
-    # 1. 建立 logger 並存 config（不包含 env，避免 JSON 序列化問題）
+    # 1. 建立 logger 並存 config（不包含 env，避免 JSON 序列化問題），也把trajectory saver存好
     # ----------------------------------------------------------
     logger = EpochLogger(**logger_kwargs)
     _locals = locals()
@@ -786,6 +785,7 @@ def thrifty(
     num_switch_to_exp = 0
     num_switch_to_recovery = 0  # 因 risk 切到 human 次數
     num_switch_to_robot = 0  # 從 human/recovery 切回 robot 次數
+    
 
     # ----------------------------------------------------------
     # 10. Main ThriftyDAgger Loop
@@ -823,7 +823,7 @@ def thrifty(
                 [],  # actions
                 [],  # rewards
                 [],  # done flags
-                [],  # sup 標記（1: supervised, 0: robot）
+                [],  # sup 標記（0: robot, 1: expert mode, 2: recovery policy）
                 [ac.variance(o)],  # 初始 state 的 variance
                 [],  # safety scores
             )
@@ -885,7 +885,7 @@ def thrifty(
                     s_flag = env.is_success()
 
                     act.append(a_expert)
-                    sup.append(1)  # 1 = supervised (human / recovery)
+                    sup.append(1)  # 1 = supervised expert mode (controlled by expert)
 
                     qbuffer.store(o, a_expert, o2, int(s_flag), done)
 
@@ -909,7 +909,7 @@ def thrifty(
                     done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_recovery)
-                    sup.append(1)
+                    sup.append(2) # 2 = supervised safety mode (controlled by recovery policy)
                     qbuffer.store(o, a_recovery, o2, int(s_flag), done)
 
                     if ac.safety(o, a_robot) > switch2robot_thresh2:
@@ -967,7 +967,7 @@ def thrifty(
                 "simstates": np.array(simstates) if robosuite else None,
             }
             logging_data.append(episode_dict)
-
+            
             pickle.dump(
                 logging_data,
                 open(
@@ -975,6 +975,13 @@ def thrifty(
                     "wb",
                 ),
             )
+            ball_x, ball_y = [], []
+            for o in obs:
+                ball_x.append(o[0])
+                ball_y.append(o[1])
+            hdf5_trajectories_file[f'training/episode{ep_num}/obs/x'] = np.array(ball_x)
+            hdf5_trajectories_file[f'training/episode{ep_num}/obs/y'] = np.array(ball_y)
+            hdf5_trajectories_file[f'training/episode{ep_num}/policy'] = np.array(sup)
 
             # online 更新 switching thresholds
             if (
