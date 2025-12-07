@@ -200,21 +200,18 @@ if __name__ == "__main__":
 
     input_group.add_argument(
         "--pkl_input",
-        "-p",
         type=Path,
         help="Path to the trajectory pkl file.",
     )
 
     input_group.add_argument(
         "--hdf5_input",
-        "-h",
         type=Path,
         help="Path to the trajectory hdf5 file.",
     )
 
     parser.add_argument(
         "--output",
-        "-o",
         type=Path,
         default=None,
         help="Path to save the plot image. If not provided, the plot will be shown instead.",
@@ -230,17 +227,19 @@ if __name__ == "__main__":
     # argument for hdf5 trajectory input
     parser.add_argument(
         "--hdf5_training_traj",
-        type=bool,
-        default=False,
+        action="store_true",
+        dest="render",
         help="If using hdf5 file as input, then enable training trajectory observation.",
     )
+    parser.set_defaults(hdf5_training_traj=False)
 
     parser.add_argument(
         "--hdf5_testing_traj",
-        type=bool,
-        default=False,
+        action="store_true",
+        dest="render",
         help="If using hdf5 file as input, then enable training trajectory observation.",
     )
+    parser.set_defaults(hdf5_testing_traj=False)
 
     args = parser.parse_args()
     main(
