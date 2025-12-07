@@ -2,7 +2,7 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp_expert_four_room_noisy"
+EXP_NAME="exp_expert_four_room_noisy=0.2"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
