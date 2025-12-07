@@ -80,10 +80,11 @@ class LunarLanderSuccessWrapper(Wrapper):
 
 
 class MazeWrapper(Wrapper):
-    def __init__(self, env, maze, touch_wall_distance: float = 0.1):
+    def __init__(self, env, maze=None, touch_wall_distance: float = 0.1):
         super().__init__(env)
         self.success = False
-        self.maze = np.asarray(maze)
+        if maze:
+            self.maze = np.asarray(maze)
         self.touch_wall_distance = touch_wall_distance
 
     def step(self, action):
@@ -94,10 +95,11 @@ class MazeWrapper(Wrapper):
         vx = obs[2]
         vy = obs[3]
 
-        dist = nearest_wall_distance(self.maze, x, y, self.env)
-        if dist < 0.1:
-            info["touched_wall"] = True
-            terminated = True
+        if self.maze:
+            dist = nearest_wall_distance(self.maze, x, y, self.env)
+            if dist < 0.1:
+                info["touched_wall"] = True
+                terminated = True
 
         # FIXME: I am not sure whether to put "and done" here
         self.success = reward > 0
@@ -137,3 +139,6 @@ class NoisyActionWrapper(ActionWrapper):
         self.enabled = enabled
         if noise_scale is not None:
             self.noise_scale = noise_scale
+
+    def cell_rowcol_to_xy(i, j):
+        return super().cell_rowcol_to_xy(i, j)
