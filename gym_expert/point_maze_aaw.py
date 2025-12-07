@@ -6,6 +6,7 @@ checkpoint callbacks, best-model video recording, and performance plotting.
 
 import os
 import platform
+import math
 from collections import deque
 from importlib.metadata import version
 
@@ -118,6 +119,8 @@ class CustomRewardFlattenObservation(FlattenObservation):
         self.grid_rows, self.grid_cols = self.distance_field.shape
         self._cell_size = self._extract_cell_size()
         self._xy_to_rowcol_fn = self._extract_xy_to_rowcol_fn()
+        grid = np.array(self.maze_grid, copy=False)
+        self.maze = grid == 1
 
     def reset(self, **kwargs):
         obs_dict, info = self.env.reset(**kwargs)
@@ -128,6 +131,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
     def step(self, action):
         obs_dict, reward, terminated, truncated, info = self.env.step(action)
         v_x, v_y = obs_dict["observation"][2], obs_dict["observation"][3]
+        a_x, a_y = action[0], action[1]
         x, y = obs_dict["observation"][:2]
 
         i, j = self._world_to_cell(x, y)
@@ -139,24 +143,77 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = 200.0
             success = True
         elif reward_map[i][j] == "R":
-            shaped_reward = v_x 
+            shaped_reward = v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) + 0.5*a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
         elif reward_map[i][j] == "L":
-            shaped_reward = -v_x 
+            shaped_reward = -v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) - 0.5*a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
         elif reward_map[i][j] == "U":
-            shaped_reward = v_y 
+            shaped_reward = v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)   + 0.5*a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
         elif reward_map[i][j] == "D":
-            shaped_reward = -v_y 
+            shaped_reward = -v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)  - 0.5*a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
         else:
             shaped_reward = 0.0
+        hit_wall = False
+        # if self.maze is not None:
+        #     dist = self.nearest_wall_distance(self.maze, x, y, self.env)
+        #     if dist < 0.1:
+        #         info["touched_wall"] = True
+        #         hit_wall = True
+        #         terminated = True
 
-        shaped_reward = 10 * shaped_reward - 15
+        if hit_wall:
+            shaped_reward = -100.0
+        else:
+            shaped_reward = 10 * shaped_reward - 15
 
         if success:
             terminated = True
             info["is_success"] = True
 
+
         flat_obs = self.observation(obs_dict)
         return flat_obs, shaped_reward, terminated, truncated, info
+    # ----- hit the wall helpers -----
+    def nearest_wall_distance(self, walls: np.ndarray, x: float, y: float, env) -> float:
+        """
+        Return the shortest Euclidean distance from (x, y) to any wall cell rectangle.
+        Walls is a boolean grid aligned with self.maze_grid.
+        """
+        if walls is None:
+            return math.inf
+
+        wall_indices = np.argwhere(walls)
+        if wall_indices.size == 0:
+            return math.inf
+
+        cell_size = self._cell_size or 1.0
+        half = cell_size / 2.0
+        min_dist = math.inf
+
+        for i, j in wall_indices:
+            cx, cy = self._cell_center_from_grid(i, j, cell_size=cell_size)
+            x_min, x_max = cx - half, cx + half
+            y_min, y_max = cy - half, cy + half
+
+            if x < x_min:
+                dx = x_min - x
+            elif x > x_max:
+                dx = x - x_max
+            else:
+                dx = 0.0
+
+            if y < y_min:
+                dy = y_min - y
+            elif y > y_max:
+                dy = y - y_max
+            else:
+                dy = 0.0
+
+            dist = math.hypot(dx, dy)
+            if dist < min_dist:
+                min_dist = dist
+
+        return min_dist
+
 
     # ----- distance helpers -----
     def _compute_distance_field(self, maze_grid: np.ndarray):
