@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=Path,
-        default=root / "./models/best_model_mediumdense.zip",
+        default=root / "./models/best_model.zip",
         help="Path to trained SAC model (.zip).",
     )
     parser.add_argument(
@@ -43,19 +43,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--episodes",
         type=int,
-        default=1000,
+        default=10,
         help="Number of episodes to collect.",
     )
     parser.add_argument(
         "--max_steps",
         type=int,
-        default=None,
+        default=1300,
         help="Optional cap on steps per episode (defaults to env horizon).",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=root / "offline_dataset_4rooms_1000.pkl",
+        default=root / "offline_dataset_aawmaze_10.pkl",
         help="Where to store the collected dataset (pickle).",
     )
     parser.add_argument(
