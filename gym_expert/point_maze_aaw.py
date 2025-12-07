@@ -87,7 +87,7 @@ EVAL_ENVS = 1
 EVAL_FREQ = 3125
 N_EVAL_EPISODES = 10
 
-VIDEO_RECORD_FREQ = 50_000
+VIDEO_RECORD_FREQ = 50_000_000
 
 # Total training steps; Point Maze is sparse so budget generously for expert-quality policy.
 TOTAL_TIMESTEPS = 600_000
