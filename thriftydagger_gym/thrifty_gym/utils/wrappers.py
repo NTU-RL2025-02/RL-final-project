@@ -10,13 +10,26 @@ class LunarLanderSuccessWrapper(Wrapper):
     Success is defined as achieving an episode reward of at least 200.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, maze):
         super().__init__(env)
         self.success = False
         self.ep_reward = 0.0
+        self.maze = maze
 
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
+
+        x = obs[0]
+        y = obs[1]
+        vx = obs[2]
+        vy = obs[3]
+
+        for i, row in enumerate(self.maze):
+            for j, cell in enumerate(row):
+                if cell == "g":
+                    goal_x = j + 0.5
+                    goal_y = len(self.maze) - i - 0.5
+
         done = terminated or truncated
         self.ep_reward += reward
 

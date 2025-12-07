@@ -48,12 +48,12 @@ print(f"Numpy Version: {safe_version('numpy')}")
 print(f"Stable Baselines3 Version: {safe_version('stable_baselines3')}", flush=True)
 
 RL_TYPE = "SAC"
-ENV_ID = "PointMaze_UMaze-v3"  # choose any PointMaze variant you prefer
+ENV_ID = "PointMaze_Large-v3"  # choose any PointMaze variant you prefer
 LOG_DIR = os.path.join("./logs", ENV_ID)
 NAME_PREFIX = "point_maze_sac"
 MAZE_FILE = "maze_4room.txt"
 REWARD_FILE = "maze_4room_reward.txt"
-MAX_EPISODE_STEPS = 800  # allow longer rollouts per episode
+MAX_EPISODE_STEPS = 1000  # allow longer rollouts per episode
 
 with open(MAZE_FILE) as file:
     MAZE = [
