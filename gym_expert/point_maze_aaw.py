@@ -143,25 +143,26 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = 200.0
             success = True
         elif reward_map[i][j] == "R":
-            shaped_reward = v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) + 0.5*a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) + a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
         elif reward_map[i][j] == "L":
-            shaped_reward = -v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) - 0.5*a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = -v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) - a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
         elif reward_map[i][j] == "U":
-            shaped_reward = v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)   + 0.5*a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)   + a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
         elif reward_map[i][j] == "D":
-            shaped_reward = -v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)  - 0.5*a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = -v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)  - a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
         else:
             shaped_reward = 0.0
         hit_wall = False
-        # if self.maze is not None:
-        #     dist = self.nearest_wall_distance(self.maze, x, y, self.env)
-        #     if dist < 0.1:
-        #         info["touched_wall"] = True
-        #         hit_wall = True
-        #         terminated = True
+        if self.maze is not None:
+            dist = self.nearest_wall_distance(self.maze, x, y, self.env)
+            if dist < 0.1:
+                info["touched_wall"] = True
+                hit_wall = True
+                truncated = True
 
         if hit_wall:
-            shaped_reward = -100.0
+            shaped_reward = -150.0
+            # print("Hit wall penalty applied.")
         else:
             shaped_reward = 10 * shaped_reward - 15
 
