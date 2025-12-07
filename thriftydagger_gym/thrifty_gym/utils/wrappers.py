@@ -95,7 +95,7 @@ class MazeWrapper(Wrapper):
         vx = obs[2]
         vy = obs[3]
 
-        if self.maze:
+        if self.maze is not None:
             dist = nearest_wall_distance(self.maze, x, y, self.env)
             if dist < 0.1:
                 info["touched_wall"] = True
