@@ -2,12 +2,12 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp_five_q_four_room"
+EXP_NAME="exp_expert_four_room_noisy"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
-RECOVERY_TYPE="five_q"
+RECOVERY_TYPE="expert"
 BC_CKPT="models/bc_policy_4room_10.pt"   # 跟剛剛存的一樣路徑
 
 # 檢查 session 是否已存在
@@ -31,6 +31,8 @@ python3 scripts/run_thriftydagger.py \
   --environment 'PointMaze_4rooms-v3' \
   --recovery_type $RECOVERY_TYPE \
   --num_test_episodes 100 \
+  --fix_thresholds \
+  --noisy_scale 0.1 \
   --bc_checkpoint $BC_CKPT \
   --skip_bc_pretrain \
   $BASENAME > output_$BASENAME.txt 2>&1
