@@ -1,4 +1,4 @@
-from typing import Dict, Sequence, Union
+from typing import Dict, Sequence, Union, List
 import math
 import numpy as np
 from gymnasium import Wrapper, ActionWrapper
@@ -115,10 +115,23 @@ class MazeWrapper(Wrapper):
 
 
 class NoisyActionWrapper(ActionWrapper):
-    def __init__(self, env, noise_scale=0.1):
+    def __init__(self, 
+            env, 
+            maze_map: List[List[Union[str, int]]],
+            maze_size_scaling: float,
+            noise_scale=0.1, 
+        ):
         super().__init__(env)
         self.noise_scale = noise_scale
         self.enabled = True  # 控制要不要加 noise
+        
+        self.maze_map = maze_map
+        self.maze_size_scaling = maze_size_scaling
+        self.maze_size_scaling = maze_size_scaling
+        self.map_length = len(maze_map)
+        self.map_width = len(maze_map[0])
+        self.x_map_center = self.map_width / 2 * maze_size_scaling
+        self.y_map_center = self.map_length / 2 * maze_size_scaling
 
     def action(self, action):
         if not self.enabled or self.noise_scale == 0:
@@ -140,5 +153,8 @@ class NoisyActionWrapper(ActionWrapper):
         if noise_scale is not None:
             self.noise_scale = noise_scale
 
-    def cell_rowcol_to_xy(i, j):
-        return super().cell_rowcol_to_xy(i, j)
+    def cell_rowcol_to_xy(self, i, j):
+        x = (j + 0.5) * self.maze_size_scaling - self.x_map_center
+        y = self.y_map_center - (i + 0.5) * self.maze_size_scaling
+
+        return np.array([x, y])
