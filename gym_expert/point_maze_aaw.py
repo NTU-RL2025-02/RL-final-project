@@ -159,18 +159,25 @@ class CustomRewardFlattenObservation(FlattenObservation):
         else:
             shaped_reward = 0.0
         hit_wall = False
-        # if self.maze is not None:
-        #     dist = self.nearest_wall_distance(self.maze, x, y, self.env)
-        #     if dist < 0.1:
-        #         info["touched_wall"] = True
-        #         hit_wall = True
-        #         truncated = True
+        proximity_penalty = 0
+        if self.maze is not None:
+            dist = self.nearest_wall_distance(self.maze, x, y, self.env)
+
+            if dist < 0.1:
+                # 真正撞牆：給一個固定懲罰並截斷 episode
+                hit_wall = True
+                info["touched_wall"] = True
+                truncated = True
+                
+            elif dist < 2:
+                proximity_penalty = 100 * (2 - dist)
+
 
         if hit_wall:
             shaped_reward = -100
             # print("Hit wall penalty applied.")
         else:
-            shaped_reward = 10 * shaped_reward - 15
+            shaped_reward = 2 * shaped_reward - 1 - proximity_penalty
 
         if success:
             terminated = True
