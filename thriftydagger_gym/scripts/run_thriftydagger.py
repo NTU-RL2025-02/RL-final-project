@@ -150,6 +150,7 @@ def main(args):
 
     
     # ---- hdf5 檔案用以儲存training time trajectories ----
+    os.makedirs(logger_kwargs["output_dir"])
     hdf5_trajectories_file = h5py.File(
         os.path.join(
             logger_kwargs["output_dir"],
