@@ -501,7 +501,7 @@ def main() -> None:
 
     # video_callback = PeriodicVideoRecorder(record_freq=VIDEO_RECORD_FREQ)
 
-    callback_list = CallbackList([checkpoint_callback, eval_callback, video_callback])
+    # callback_list = CallbackList([checkpoint_callback, eval_callback, video_callback])
 
     # Initialize SAC
     model = SAC(
@@ -515,7 +515,7 @@ def main() -> None:
     model.learn(
         total_timesteps=TOTAL_TIMESTEPS,
         progress_bar=True,
-        callback=callback_list,
+        # callback=callback_list,
     )
 
     # Save final model

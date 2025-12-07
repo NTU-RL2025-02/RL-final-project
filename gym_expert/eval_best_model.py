@@ -15,6 +15,7 @@ import gymnasium as gym
 import gymnasium_robotics  # noqa: F401  (register PointMaze envs)
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import SAC
+from point_maze_aaw import CustomRewardFlattenObservation
 
 
 DEFAULT_MODEL_PATH = Path("logs/PointMaze_Large-v3/best_model.zip")
@@ -82,7 +83,9 @@ def make_env(
     if maze_map is not None:
         env_kwargs["maze_map"] = maze_map
         env_kwargs["max_episode_steps"] = DEFAULT_MAX_STEPS
-    return FlattenObservation(gym.make(env_id, **env_kwargs))
+
+    raw_env = gym.make(env_id, **env_kwargs)
+    return CustomRewardFlattenObservation(raw_env, maze_map=maze_map)
 
 
 def extract_success(info: dict) -> Optional[bool]:
