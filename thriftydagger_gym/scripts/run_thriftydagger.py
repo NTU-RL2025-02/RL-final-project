@@ -148,14 +148,14 @@ def main(args):
     else:
         recovery_policy = QRecovery(env.observation_space, env.action_space)
 
-    
     # ---- hdf5 檔案用以儲存training time trajectories ----
     os.makedirs(logger_kwargs["output_dir"])
     hdf5_trajectories_file = h5py.File(
         os.path.join(
             logger_kwargs["output_dir"],
             "trajectories.hdf5",
-        ), "w"
+        ),
+        "w",
     )
 
     # ---- 主訓練流程 ----

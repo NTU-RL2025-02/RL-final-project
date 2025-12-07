@@ -144,8 +144,8 @@ def test_agent(
     horizon: int,
     robosuite: bool,
     logger_kwargs: Dict[str, Any],
-    epoch: int = 0, 
-    hdf5_trajectories_file: h5py.File = None
+    epoch: int = 0,
+    hdf5_trajectories_file: h5py.File = None,
 ) -> float:
     """
     使用目前 policy `ac` 在環境中跑 `num_test_episodes` 回合（不做 intervention），
@@ -155,7 +155,6 @@ def test_agent(
     """
     if num_test_episodes <= 0:
         return
-
 
     obs_list, act_list, done_list, reward_list = [], [], [], []
 
@@ -187,9 +186,13 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
-        
-        hdf5_trajectories_file[f'testing/epoch{epoch}/episode{episode_idx}/obs/x'] = np.array(ball_x)
-        hdf5_trajectories_file[f'testing/epoch{epoch}/episode{episode_idx}/obs/y'] = np.array(ball_y)
+
+        hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/x"] = (
+            np.array(ball_x)
+        )
+        hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/y"] = (
+            np.array(ball_y)
+        )
         print(
             f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
         )
@@ -521,7 +524,7 @@ def thrifty(
     bc_checkpoint: Optional[str] = None,
     save_bc_checkpoint: Optional[str] = None,
     skip_bc_pretrain: bool = False,
-    hdf5_trajectories_file: h5py.File = None, 
+    hdf5_trajectories_file: h5py.File = None,
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -784,7 +787,6 @@ def thrifty(
     num_switch_to_exp = 0
     num_switch_to_recovery = 0  # 因 risk 切到 human 次數
     num_switch_to_robot = 0  # 從 human/recovery 切回 robot 次數
-    
 
     # ----------------------------------------------------------
     # 10. Main ThriftyDAgger Loop
@@ -908,7 +910,9 @@ def thrifty(
                     done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_recovery)
-                    sup.append(2) # 2 = supervised safety mode (controlled by recovery policy)
+                    sup.append(
+                        2
+                    )  # 2 = supervised safety mode (controlled by recovery policy)
                     qbuffer.store(o, a_recovery, o2, int(s_flag), done)
 
                     if ac.safety(o, a_robot) > switch2robot_thresh2:
@@ -966,7 +970,7 @@ def thrifty(
                 "simstates": np.array(simstates) if robosuite else None,
             }
             logging_data.append(episode_dict)
-            
+
             pickle.dump(
                 logging_data,
                 open(
@@ -974,8 +978,10 @@ def thrifty(
                     "wb",
                 ),
             )
-            hdf5_trajectories_file[f'training/episode{ep_num}/position'] = np.array(obs)[:, 0:2]
-            hdf5_trajectories_file[f'training/episode{ep_num}/policy'] = np.array(sup)
+            hdf5_trajectories_file[f"training/episode{ep_num}/position"] = np.array(
+                obs
+            )[:, 0:2]
+            hdf5_trajectories_file[f"training/episode{ep_num}/policy"] = np.array(sup)
 
             # online 更新 switching thresholds
             if (
