@@ -139,13 +139,13 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = 20000.0
             success = True
         elif reward_map[i][j] == "R":
-            shaped_reward = v_x / np.linalg.norm([v_x, v_y] + 1e-8)
+            shaped_reward = v_x / (np.linalg.norm([v_x, v_y]) + 1e-8)
         elif reward_map[i][j] == "L":
-            shaped_reward = -v_x / np.linalg.norm([v_x, v_y] + 1e-8)
+            shaped_reward = -v_x / (np.linalg.norm([v_x, v_y]) + 1e-8)
         elif reward_map[i][j] == "U":
-            shaped_reward = v_y / np.linalg.norm([v_x, v_y] + 1e-8)
+            shaped_reward = v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)
         elif reward_map[i][j] == "D":
-            shaped_reward = -v_y / np.linalg.norm([v_x, v_y] + 1e-8)
+            shaped_reward = -v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)
         else:
             shaped_reward = 0.0
 
