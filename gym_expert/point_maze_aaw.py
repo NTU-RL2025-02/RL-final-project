@@ -53,7 +53,7 @@ LOG_DIR = os.path.join("./logs", ENV_ID)
 NAME_PREFIX = "point_maze_sac"
 MAZE_FILE = "maze_4room.txt"
 REWARD_FILE = "maze_4room_reward.txt"
-MAX_EPISODE_STEPS = 1000  # allow longer rollouts per episode
+MAX_EPISODE_STEPS = 1300  # allow longer rollouts per episode
 
 with open(MAZE_FILE) as file:
     MAZE = [
@@ -90,7 +90,7 @@ N_EVAL_EPISODES = 10
 VIDEO_RECORD_FREQ = 50_000
 
 # Total training steps; Point Maze is sparse so budget generously for expert-quality policy.
-TOTAL_TIMESTEPS = 1_200_000
+TOTAL_TIMESTEPS = 600_000
 
 # Visual settings
 VIDEO_CAMERA_DISTANCE_SCALE = 3.2  # lift camera higher for clearer recordings
@@ -136,7 +136,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
         if reward_map[i][j] == "0":
             shaped_reward = -1.0
         elif reward_map[i][j] == "1":
-            shaped_reward = 20000.0
+            shaped_reward = 200.0
             success = True
         elif reward_map[i][j] == "R":
             shaped_reward = v_x / (np.linalg.norm([v_x, v_y]) + 1e-8)
@@ -149,7 +149,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
         else:
             shaped_reward = 0.0
 
-        shaped_reward = shaped_reward - 10
+        shaped_reward = 10 * shaped_reward - 15
 
         if success:
             terminated = True
