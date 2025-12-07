@@ -32,7 +32,7 @@ python3 scripts/run_thriftydagger.py \
   --recovery_type $RECOVERY_TYPE \
   --num_test_episodes 100 \
   --fix_thresholds \
-  --noisy_scale 0.1 \
+  --noisy_scale 0.2 \
   --bc_checkpoint $BC_CKPT \
   --skip_bc_pretrain \
   $BASENAME > output_$BASENAME.txt 2>&1
