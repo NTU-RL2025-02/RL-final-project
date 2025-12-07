@@ -341,6 +341,31 @@ class CustomRewardFlattenObservation(FlattenObservation):
         return None
 
 
+class RewardAndCameraWrapper(CustomRewardFlattenObservation):
+    def __init__(self, env, maze_map=None, distance=7.0, elevation=-80, azimuth=90):
+        super().__init__(env, maze_map=maze_map)
+        self._cam_distance = distance
+        self._cam_elevation = elevation
+        self._cam_azimuth = azimuth
+
+    def render(self, *args, **kwargs):
+        self._set_camera()
+        return super().render(*args, **kwargs)
+
+    def _set_camera(self):
+        base = self.env
+        while hasattr(base, "env"):
+            base = base.env
+        renderer = getattr(base, "mujoco_renderer", None)
+        if renderer is None:
+            return
+        viewer = renderer._get_viewer("rgb_array")
+        cam = viewer.cam
+        cam.distance = self._cam_distance
+        cam.elevation = self._cam_elevation
+        cam.azimuth = self._cam_azimuth
+
+
 class PeriodicVideoRecorder(BaseCallback):
     """Record a rollout every `record_freq` training timesteps."""
 
@@ -478,7 +503,7 @@ def record_video(
         ENV_ID,
         n_envs=1,
         seed=42,
-        wrapper_class=CustomRewardFlattenObservation,
+        wrapper_class=RewardAndCameraWrapper,
         wrapper_kwargs={"maze_map": MAZE},
         env_kwargs=env_kwargs,
     )
