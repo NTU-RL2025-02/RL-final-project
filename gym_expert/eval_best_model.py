@@ -17,7 +17,7 @@ from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import SAC
 
 
-DEFAULT_MODEL_PATH = Path("logs/PointMaze_Large-v3/best_model.zip")
+DEFAULT_MODEL_PATH = Path("logs/PointMaze_UMaze-v3/best_model.zip")
 DEFAULT_ENV_ID = "PointMaze_UMaze-v3"
 DEFAULT_EPISODES = 20
 DEFAULT_MAZE_FILE = Path("maze_4room.txt")
