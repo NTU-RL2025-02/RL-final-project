@@ -2,6 +2,7 @@ import pickle
 import h5py
 import argparse
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -69,14 +70,14 @@ def load_hdf5_trajectories(
     with h5py.File(path, "r") as f:
         if hdf5_training_traj:
             for ep in f["training"]:
-                episode_obs.append(f[f"training/{ep}/position"])
-                policy_using.append(f[f"training/{ep}/policy"])
+                episode_obs.append(f[f"training/{ep}/position"][()])
+                policy_using.append(f[f"training/{ep}/policy"][()])
         if hdf5_testing_traj:
             for ep in f["testing"]:
-                episode_obs.append(f[f"testing/{ep}/position"])
+                episode_obs.append(f[f"testing/{ep}/position"][()])
                 policy_using.append(None)
         
-    return np.array(episode_obs), policy_using
+    return episode_obs, policy_using
 
 
 def main(
@@ -84,6 +85,7 @@ def main(
     input_path: Path,
     output_path: Path = None,
     maze_layout: str = "medium",
+    sample_amount: int | None = None, 
     hdf5_training_traj: bool = False,
     hdf5_testing_traj: bool = False,
 ) -> None:
@@ -99,8 +101,14 @@ def main(
         )
 
     print(f"Loaded {len(episodes_obs)} episodes from {input_path}")
-    if episodes_obs:
+    if len(episodes_obs) != 0:
         print("First episode obs shape:", episodes_obs[0].shape)
+
+    if sample_amount != None:
+        idx = np.random.choice(len(episodes_obs), size=sample_amount, replace=False)
+        episodes_obs = episodes_obs[idx]
+        print(f"Sampled {len(episodes_obs)} episodes from all trajectories")
+
 
     # 2. 建立圖
     plt.figure(figsize=(8, 8))
@@ -145,7 +153,7 @@ def main(
             plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
             plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
         elif input_type == "hdf5":
-            if policy_using[ep_idx] == None:
+            if policy_using[ep_idx] is not None:
                 # testing stage
                 # 畫軌跡線
                 plt.plot(xs, ys, alpha=0.5, linewidth=1)
@@ -155,9 +163,11 @@ def main(
                 plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
             else:
                 # training stage
-                previous_policy = policy_using[0]
+                previous_policy = policy_using[ep_idx][0]
                 x_seg, y_seg = [xs[0]], [ys[0]]
-                for i, x, y, p in enumerate(zip(xs[1:], ys[1:], policy_using)):
+                print(xs, ys)
+                for i, xyp in enumerate(zip(xs[1:], ys[1:], policy_using[ep_idx])):
+                    x, y, p = xyp
                     x_seg.append(x)
                     y_seg.append(y)
                     if p != previous_policy:
@@ -179,7 +189,7 @@ def main(
                     color=("black", "red", "green")[previous_policy],
                     label=("robot", "expert", "recovery")[previous_policy],
                 )
-                plt.legend()
+                # plt.legend()
                 # 起點/終點標記（可選）
                 plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
                 plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
@@ -224,11 +234,18 @@ if __name__ == "__main__":
         default="medium",
         help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms'.",
     )
+    
+    parser.add_argument(
+        "--sample-amount",
+        type=int,
+        default=None, 
+        help="trajectory sample amount from the dataset",
+    )
 
     # argument for hdf5 trajectory input
     parser.set_defaults(hdf5_training_traj=False)
     parser.add_argument(
-        "--hdf5_training_traj",
+        "--hdf5-training-traj",
         action="store_true",
         dest="hdf5_training_traj",
         help="If using hdf5 file as input, then enable training trajectory observation.",
@@ -236,7 +253,7 @@ if __name__ == "__main__":
 
     parser.set_defaults(hdf5_testing_traj=False)
     parser.add_argument(
-        "--hdf5_testing_traj",
+        "--hdf5-testing-traj",
         action="store_true",
         dest="hdf5_testing_traj",
         help="If using hdf5 file as input, then enable training trajectory observation.",
@@ -248,6 +265,7 @@ if __name__ == "__main__":
         args.pkl_input if args.pkl_input is not None else args.hdf5_input,
         args.output,
         args.maze_layout,
+        args.sample_amount, 
         args.hdf5_training_traj,
         args.hdf5_testing_traj,
     )

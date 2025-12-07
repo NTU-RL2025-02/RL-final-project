@@ -125,7 +125,7 @@ def main(args):
             maze_map=FOUR_ROOMS_ANGLE,
         )
         env = FlattenObservation(env)
-        env = NoisyActionWrapper(env, FOUR_ROOMS_ANGLE, 1.0, noise_scale=args.noisy_scale)
+        env = NoisyActionWrapper(env, FOUR_ROOMS_ANGLE, 21, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE)  # add success wrapper
 
     else:

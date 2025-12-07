@@ -505,7 +505,7 @@ def thrifty(
     batch_size: int = 100,
     logger_kwargs: Dict[str, Any] = dict(),
     num_test_episodes: int = 10,
-    bc_epochs: int = 5,
+    bc_epochs: int = 20,
     input_file: str = "data.pkl",
     device_idx: int = 0,
     expert_policy: Optional[Any] = None,
@@ -779,6 +779,7 @@ def thrifty(
     # 訓練過程中統計資訊
     total_env_interacts = 0  # 環境互動的總步數
     ep_num = 0  # 總 episode 數
+    record_ep_num = 0 # 紀錄 h5py 檔案所用的計數器，不管有沒有done都累加
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
     num_switch_to_novel = 0  # 因 novelty 切到 human 次數
@@ -803,7 +804,7 @@ def thrifty(
         logging_data: List[Dict[str, Any]] = []
         estimates: List[float] = []
         estimates2: List[float] = []
-
+        
         while step_count < obs_per_iter:
             expert_policy.start_episode()
             recovery_policy.start_episode()
@@ -947,6 +948,7 @@ def thrifty(
                 step_count += 1
                 ep_len += 1
 
+            record_ep_num += 1
             if done:
                 ep_num += 1
                 # === Save per-episode ball trajectory ===
@@ -977,10 +979,10 @@ def thrifty(
                 ),
             )
             with h5py.File(os.path.join(logger_kwargs["output_dir"], f"epoch{epoch_idx}_trajectories.hdf5",), "a") as hdf5_trajectories_file:
-                hdf5_trajectories_file[f"training/episode{ep_num}/position"] = np.array(
+                hdf5_trajectories_file[f"training/episode{record_ep_num}/position"] = np.array(
                     obs
                 )[:, 0:2]
-                hdf5_trajectories_file[f"training/episode{ep_num}/policy"] = np.array(sup)
+                hdf5_trajectories_file[f"training/episode{record_ep_num}/policy"] = np.array(sup)
 
             # online 更新 switching thresholds
             if (
