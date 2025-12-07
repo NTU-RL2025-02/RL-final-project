@@ -974,12 +974,7 @@ def thrifty(
                     "wb",
                 ),
             )
-            ball_x, ball_y = [], []
-            for o in obs:
-                ball_x.append(o[0])
-                ball_y.append(o[1])
-            hdf5_trajectories_file[f'training/episode{ep_num}/obs/x'] = np.array(ball_x)
-            hdf5_trajectories_file[f'training/episode{ep_num}/obs/y'] = np.array(ball_y)
+            hdf5_trajectories_file[f'training/episode{ep_num}/position'] = np.array(obs)[:, 0:2]
             hdf5_trajectories_file[f'training/episode{ep_num}/policy'] = np.array(sup)
 
             # online 更新 switching thresholds

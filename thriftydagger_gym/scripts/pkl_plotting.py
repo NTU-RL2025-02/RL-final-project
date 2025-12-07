@@ -1,4 +1,5 @@
 import pickle
+import h5py
 import argparse
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from thrifty_gym.maze import FOUR_ROOMS_21x21, FOUR_ROOMS_ANGLE
 from gymnasium_robotics.envs.maze.maps import MEDIUM_MAZE
 
 
-def load_rollouts(path: Path):
+def load_pkl_rollouts(path: Path):
     """讀取 test-rollouts.pkl / test{epoch}.pkl。"""
     with open(path, "rb") as f:
         data = pickle.load(f)
@@ -24,7 +25,7 @@ def load_rollouts(path: Path):
     return data
 
 
-def split_episodes(data):
+def split_pkl_episodes(data):
     """
     將攤平成一條時間序列的 rollouts，用 done 切回 episode。
 
@@ -60,13 +61,36 @@ def split_episodes(data):
     return episodes_obs
 
 
+def load_hdf5_trajectories(path: Path, hdf5_training_traj: bool = False, hdf5_testing_traj: bool = False):
+    """讀取 trajectories.hdf5"""
+    episode_obs, policy_using = [], []
+    with h5py.File(path, "r") as f:
+        if hdf5_training_traj:
+            for traj in f['training']:
+                episode_obs.append(traj['position'])
+                policy_using.append(traj['policy'])
+        if hdf5_testing_traj:
+            for traj in f['testing']:
+                episode_obs.append(traj['position'])
+                policy_using.append(None)
+    return np.array(episode_obs), policy_using
+
 def main(
-    input_path: Path, output_path: Path = None, maze_layout: str = "medium"
+    input_type: str, 
+    input_path: Path, 
+    output_path: Path = None, 
+    maze_layout: str = "medium",
+    hdf5_training_traj: bool = False, 
+    hdf5_testing_traj: bool = False
 ) -> None:
     """Load a trajectory pkl file and plot all trace."""
-    # 1. 讀 pkl 並拆成 episodes
-    data = load_rollouts(input_path)
-    episodes_obs = split_episodes(data)
+    # 1. 讀 pkl 或 hdf5 並拆成 episodes
+    if input_type == 'pkl': 
+        data = load_pkl_rollouts(input_path)
+        episodes_obs = split_pkl_episodes(data)
+        policy_using = [None] * episodes_obs.shape[0]
+    elif input_type == 'hdf5':
+        episodes_obs, policy_using = load_hdf5_trajectories(input_path, hdf5_training_traj, hdf5_testing_traj)
 
     print(f"Loaded {len(episodes_obs)} episodes from {input_path}")
     if episodes_obs:
@@ -106,13 +130,40 @@ def main(
 
         xs = ep_obs[:, 0]
         ys = ep_obs[:, 1]
+        
+        if input_type == 'pkl':
+            # 畫軌跡線
+            plt.plot(xs, ys, alpha=0.5, linewidth=1)
 
-        # 畫軌跡線
-        plt.plot(xs, ys, alpha=0.5, linewidth=1)
+            # 起點/終點標記（可選）
+            plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
+            plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
+        elif input_type == 'hdf5':
+            if policy_using[ep_idx] == None:
+                # testing stage
+                # 畫軌跡線
+                plt.plot(xs, ys, alpha=0.5, linewidth=1)
 
-        # 起點/終點標記（可選）
-        plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
-        plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
+                # 起點/終點標記（可選）
+                plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
+                plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
+            else:
+                # training stage
+                previous_policy = policy_using[0]
+                x_seg, y_seg = [xs[0]], [ys[0]]
+                for i, x, y, p in enumerate(zip(xs[1:], ys[1:], policy_using)):
+                    x_seg.append(x)
+                    y_seg.append(y)
+                    if p != previous_policy:
+                        plt.plot(x_seg, y_seg, alpha = 0.5, linewidth = 1, color = ('black', 'red', 'green')[previous_policy], label = ('robot', 'expert', 'recovery')[previous_policy])
+                        previous_policy = p
+                        x_seg, y_seg = [x], [y]
+                plt.plot(x_seg, y_seg, alpha = 0.5, linewidth = 1, color = ('black', 'red', 'green')[previous_policy], label = ('robot', 'expert', 'recovery')[previous_policy])
+                plt.legend()
+                # 起點/終點標記（可選）
+                plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
+                plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
+        
 
     # 5. 輸出或顯示
     if output_path:
@@ -127,14 +178,22 @@ if __name__ == "__main__":
         description="Load a trajectory pkl file and plot all trace."
     )
 
-    parser.add_argument(
-        "--input",
-        "-i",
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    
+    input_group.add_argument(
+        "--pkl_input",
+        "-p",
         type=Path,
-        required=True,
         help="Path to the trajectory pkl file.",
     )
 
+    input_group.add_argument(
+        "--hdf5_input",
+        "-h",
+        type=Path,
+        help="Path to the trajectory hdf5 file.",
+    )
+    
     parser.add_argument(
         "--output",
         "-o",
@@ -150,5 +209,27 @@ if __name__ == "__main__":
         help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms'.",
     )
 
+    # argument for hdf5 trajectory input
+    parser.add_argument(
+        "--hdf5_training_traj",
+        type=bool,
+        default=False,
+        help="If using hdf5 file as input, then enable training trajectory observation.",
+    )
+    
+    parser.add_argument(
+        "--hdf5_testing_traj",
+        type=bool,
+        default=False,
+        help="If using hdf5 file as input, then enable training trajectory observation.",
+    )
+
     args = parser.parse_args()
-    main(args.input, args.output, args.maze_layout)
+    main(
+        'pkl' if args.pkl_input is not None else 'hdf5', 
+        args.pkl_input if args.pkl_input is not None else args.hdf5_input, 
+        args.output, 
+        args.maze_layout,
+        args.hdf5_training_traj,
+        args.hdf5_testing_traj
+    )
