@@ -24,7 +24,12 @@ from thrifty_gym.utils.wrappers import (
     NoisyActionWrapper,
 )
 from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery, ExpertAsRecovery
-from thrifty_gym.maze import FOUR_ROOMS_ANGLE, FOUR_ROOMS_REWARD, FOUR_ROOMS_ANGLE_SINGLE_START, FOUR_ROOMS_21x21
+from thrifty_gym.maze import (
+    FOUR_ROOMS_ANGLE,
+    FOUR_ROOMS_REWARD,
+    FOUR_ROOMS_ANGLE_SINGLE_START,
+    FOUR_ROOMS_21_21,
+)
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
 import gymnasium as gym
@@ -125,14 +130,12 @@ def main(args):
             continuing_task=False,
             reset_target=False,
             render_mode="human" if render else None,
-            maze_map=FOUR_ROOMS_21x21,
+            maze_map=FOUR_ROOMS_21_21,
         )
         env = FlattenObservation(env)
-        env = NoisyActionWrapper(
-            env, noise_scale=args.noisy_scale
-        )
-        env = MazeWrapper(env, FOUR_ROOMS_21x21)  # add success wrapper
-        
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
+        env = MazeWrapper(env, FOUR_ROOMS_21_21)  # add success wrapper
+
     elif args.environment == "PointMaze_4rooms-v3-angle":
         env = gym.make(
             "PointMaze_Medium-v3",
@@ -142,9 +145,7 @@ def main(args):
             maze_map=FOUR_ROOMS_ANGLE_SINGLE_START,
         )
         env = FlattenObservation(env)
-        env = NoisyActionWrapper(
-            env, noise_scale=args.noisy_scale
-        )
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)  # add success wrapper
 
     elif args.environment == "PointMaze_4rooms-v3-angle-random-start":
@@ -156,9 +157,7 @@ def main(args):
             maze_map=FOUR_ROOMS_ANGLE,
         )
         env = FlattenObservation(env)
-        env = NoisyActionWrapper(
-            env, noise_scale=args.noisy_scale
-        )
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE)  # add success wrapper
 
     else:

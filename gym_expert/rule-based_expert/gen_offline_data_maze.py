@@ -13,10 +13,11 @@ import argparse
 import pickle
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
-
+from gymnasium import Wrapper
 import gymnasium as gym
 import gymnasium_robotics  # noqa: F401  (register PointMaze envs)
 import numpy as np
+from thrifty_gym.utils.wrappers import nearest_wall_distance
 
 from point_maze_rule_based import (
     MazeLocator,
@@ -31,7 +32,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # Defaults mirror point_maze_rule_based.py
 DEFAULT_ENV_ID = "PointMaze_Large-v3"
-DEFAULT_MAZE_FILE = BASE_DIR / "maze_4room_test.txt"
+DEFAULT_MAZE_FILE = BASE_DIR / "maze_4room.txt"
 DEFAULT_REWARD_FILE = BASE_DIR / "maze_4room_reward.txt"
 DEFAULT_OUTPUT = BASE_DIR / "offline_dataset_rulebased.pkl"
 DEFAULT_EPISODES = 200
@@ -127,7 +128,9 @@ def flatten_goal_observation(
     return np.asarray(obs, dtype=np.float32)
 
 
-def extract_xy_v(obs: Union[np.ndarray, Dict[str, np.ndarray]]) -> Tuple[float, float, float, float]:
+def extract_xy_v(
+    obs: Union[np.ndarray, Dict[str, np.ndarray]],
+) -> Tuple[float, float, float, float]:
     """
     Pull (x, y, vx, vy) from a PointMaze observation (dict or flat array).
     """
@@ -202,7 +205,9 @@ def collect_rollouts(
             if success_flag:
                 terminated = True
 
-            reward = float(success_flag) if success_flag is not None else float(env_reward)
+            reward = (
+                float(success_flag) if success_flag is not None else float(env_reward)
+            )
             done_flag = terminated or truncated
 
             next_obs_flat = flatten_goal_observation(next_obs_raw)
@@ -268,6 +273,53 @@ def collect_rollouts(
     }
 
 
+class MazeWrapper(Wrapper):
+    def __init__(self, env, maze=None, touch_wall_distance: float = 0.1):
+        super().__init__(env)
+        self.success = False
+        if maze:
+            self.maze = np.asarray(maze)
+            self.n_rows, self.n_cols = self.maze.shape
+
+            wall_indices = []
+            # 找出所有牆的 index
+            for i, row in enumerate(self.maze):
+                for j, entry in enumerate(row):
+                    if entry == "1":
+                        wall_indices.append([i, j])
+            self.wall_indices = np.array(wall_indices)
+
+        self.touch_wall_distance = touch_wall_distance
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = super().step(action)
+        obs_flat = flatten_goal_observation(obs)
+        x = obs_flat[0]
+        y = obs_flat[1]
+        vx = obs_flat[2]
+        vy = obs_flat[3]
+
+        if self.wall_indices is not None:
+            dist = nearest_wall_distance(
+                x, y, self.wall_indices, self.n_cols, self.n_rows
+            )
+            if dist < 0.15:
+                info["touched_wall"] = True
+                terminated = True
+
+        # FIXME: I am not sure whether to put "and done" here
+        self.success = reward > 0
+        return obs, reward, terminated, truncated, info
+
+    def reset(self, **kwargs):
+        self.success = False
+        obs, info = super().reset(**kwargs)
+        return obs, info
+
+    def is_success(self):
+        return self.success
+
+
 def main() -> None:
     args = parse_args()
 
@@ -280,6 +332,7 @@ def main() -> None:
         max_episode_steps=args.max_steps,
         render_mode="human" if args.render else None,
     )
+    env = MazeWrapper(env, maze_map)
     env.action_space.seed(args.seed)
 
     locator = MazeLocator(env, maze_map)

@@ -7,7 +7,7 @@ from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
 
-from thrifty_gym.maze import FOUR_ROOMS_21x21, FOUR_ROOMS_ANGLE
+from thrifty_gym.maze import FOUR_ROOMS_21_21, FOUR_ROOMS_ANGLE
 from gymnasium_robotics.envs.maze.maps import MEDIUM_MAZE
 
 
@@ -77,7 +77,7 @@ def load_hdf5_trajectories(
                 for episode in f[f"testing/{epoch}"]:
                     episode_obs.append(f[f"testing/{epoch}/{episode}/position"][()])
                     policy_using.append(None)
-        
+
     return episode_obs, policy_using
 
 
@@ -86,7 +86,7 @@ def main(
     input_path: Path,
     output_path: Path = None,
     maze_layout: str = "medium",
-    sample_amount: int | None = None, 
+    sample_amount: int | None = None,
     hdf5_training_traj: bool = False,
     hdf5_testing_traj: bool = False,
 ) -> None:
@@ -111,7 +111,6 @@ def main(
         episodes_obs = [episodes_obs[i] for i in idx]
         print(f"Sampled {len(episodes_obs)} episodes from all trajectories")
 
-
     # 2. 建立圖
     plt.figure(figsize=(8, 8))
     plt.title(f"Trajectories from {input_path.name}")
@@ -121,6 +120,8 @@ def main(
 
     # 3. 畫迷宮牆
     if maze_layout == "four_rooms":
+        maze = FOUR_ROOMS_21_21
+    elif maze_layout == "four_rooms_angle":
         maze = FOUR_ROOMS_ANGLE
     elif maze_layout == "medium":
         maze = MEDIUM_MAZE
@@ -131,7 +132,7 @@ def main(
     height = len(maze)
     for i, row in enumerate(maze):
         for j, cell in enumerate(row):
-            if cell == 1:  # Wall
+            if cell == "1":  # Wall
                 x = j - width / 2
                 y = -i + height / 2
                 plt.fill_between([x, x + 1], [y - 1, y - 1], [y, y], color="yellow")
@@ -234,13 +235,13 @@ if __name__ == "__main__":
         "--maze-layout",
         type=str,
         default="four_rooms",
-        help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms'.",
+        help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms', 'four_rooms_angle'.",
     )
-    
+
     parser.add_argument(
         "--sample-amount",
         type=int,
-        default=None, 
+        default=None,
         help="trajectory sample amount from the dataset",
     )
 
@@ -267,7 +268,7 @@ if __name__ == "__main__":
         args.pkl_input if args.pkl_input is not None else args.hdf5_input,
         args.output,
         args.maze_layout,
-        args.sample_amount, 
+        args.sample_amount,
         args.hdf5_training_traj,
         args.hdf5_testing_traj,
     )

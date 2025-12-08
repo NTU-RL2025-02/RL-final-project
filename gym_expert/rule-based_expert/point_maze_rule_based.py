@@ -20,8 +20,8 @@ import gymnasium_robotics  # noqa: F401  (register PointMaze envs)
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_ENV_ID = "PointMaze_Large-v3"
-DEFAULT_MAZE_FILE = BASE_DIR / "maze_4room.txt"
-DEFAULT_REWARD_FILE = BASE_DIR / "maze_4room_reward.txt"
+DEFAULT_MAZE_FILE = BASE_DIR.parent / "maze_4room.txt"
+DEFAULT_REWARD_FILE = BASE_DIR.parent / "maze_4room_reward.txt"
 DEFAULT_EPISODES = 20
 DEFAULT_MAX_STEPS = 1300
 
@@ -98,7 +98,9 @@ def flatten_observation(obs: Sequence | dict) -> np.ndarray:
 class MazeLocator:
     def __init__(self, env: gym.Env, maze_map: Optional[list]):
         self.env = env
-        self.maze_map = np.array(maze_map, dtype=object) if maze_map is not None else None
+        self.maze_map = (
+            np.array(maze_map, dtype=object) if maze_map is not None else None
+        )
         shape = self.maze_map.shape if self.maze_map is not None else (0, 0)
         self.grid_rows, self.grid_cols = shape if shape else (0, 0)
         self._cell_size = self._extract_cell_size()
