@@ -96,9 +96,9 @@ def parse_args() -> argparse.Namespace:
         help="Render while collecting trajectories.",
     )
     parser.add_argument(
-        "--upper-left-random",
+        "--random-start",
         action="store_true",
-        help="If set, build dataset by sampling random cells from the upper-left region of the maze.",
+        help="If set, randomize the agent start cell each episode.",
     )
 
     return parser.parse_args()
@@ -132,77 +132,49 @@ def flatten_goal_observation(
 
     return np.asarray(obs, dtype=np.float32)
 
-def collect_random_dataset(
-    maze_map: np.ndarray,
-    reward_map: np.ndarray,
-    num_samples: int,
-    row_frac: float = 0.5,
-    col_frac: float = 0.5,
-    seed: int = 42,
-) -> Dict[str, np.ndarray]:
+
+def get_reachable_cells(maze_map: np.ndarray) -> List[Tuple[int, int]]:
+    maze_arr = np.asarray(maze_map, dtype=object)
+    cells: List[Tuple[int, int]] = []
+    for r in range(maze_arr.shape[0]):
+        for c in range(maze_arr.shape[1]):
+            if str(maze_arr[r, c]) in ("r", "g"):
+                cells.append((r, c))
+    return cells
+
+
+def set_random_start(
+    env: gym.Env,
+    locator: MazeLocator,
+    start_cells: Sequence[Tuple[int, int]],
+    rng: np.random.Generator,
+) -> Tuple[Union[np.ndarray, Dict[str, np.ndarray]], Dict]:
     """
-    Build an offline dataset by sampling random reachable cells
-    from the upper-left region of the maze.
-
-    - state: [row, col] (float32)
-    - action: direction_to_action(direction, vx=0, vy=0)
+    Move the puck to a random reachable cell, zero velocity, and return fresh obs/info.
     """
-    H, W = maze_map.shape
-    max_r = int(H * row_frac)
-    max_c = int(W * col_frac)
+    if not start_cells:
+        raise ValueError("No reachable cells available for random starts.")
 
-    # 收集左上角所有可走 (r, g) 的 cell
-    candidate_cells: List[Tuple[int, int]] = []
-    for r in range(max_r):
-        for c in range(max_c):
-            cell = str(maze_map[r, c])
-            if cell in ("r", "g"):
-                candidate_cells.append((r, c))
+    row, col = start_cells[rng.integers(low=0, high=len(start_cells))]
+    xy = locator._cell_center_from_grid(row, col)
 
-    if not candidate_cells:
-        raise ValueError("No reachable cells found in the upper-left region.")
+    base_env = locator._unwrap_env(env)
+    sim = getattr(base_env, "sim", None)
+    if sim is None:
+        raise RuntimeError("Cannot access simulator to set random start.")
 
-    rng = np.random.default_rng(seed)
+    sim.data.qpos[:2] = xy
+    sim.data.qvel[:2] = 0.0
+    sim.forward()
 
-    obs_list: List[np.ndarray] = []
-    act_list: List[np.ndarray] = []
-    next_obs_list: List[np.ndarray] = []
-    rew_list: List[float] = []
-    done_list: List[bool] = []
-    ep_start_list: List[bool] = []
+    # Refresh observation after teleporting the puck.
+    if hasattr(base_env, "_get_obs"):
+        obs = base_env._get_obs()
+        info: Dict = {}
+        return obs, info
 
-    # 從左上角 reachable cells 裡 random 抽 num_samples 個（可重複）
-    indices = rng.integers(low=0, high=len(candidate_cells), size=num_samples)
-    for idx in indices:
-        r, c = candidate_cells[idx]
-
-        # state = (row, col)
-        s = np.array([r, c], dtype=np.float32)
-
-        direction = str(reward_map[r, c])
-        a = direction_to_action(direction, vx=0.0, vy=0.0).astype(np.float32)
-
-        obs_list.append(s)
-        act_list.append(a)
-        # 下面幾個欄位只是為了對齊結構，BC pretrain 通常只用 obs / act
-        next_obs_list.append(s)
-        rew_list.append(0.0)
-        done_list.append(True)
-        ep_start_list.append(True)
-
-    print(
-        f"Upper-left random dataset: {len(obs_list)} state-action pairs "
-        f"from {len(candidate_cells)} candidate cells."
-    )
-
-    return {
-        "obs": np.asarray(obs_list, dtype=np.float32),
-        "act": np.asarray(act_list, dtype=np.float32),
-        "next_observations": np.asarray(next_obs_list, dtype=np.float32),
-        "rew": np.asarray(rew_list, dtype=np.float32),
-        "done": np.asarray(done_list, dtype=bool),
-        "episode_starts": np.asarray(ep_start_list, dtype=bool),
-    }
+    obs, info = env.reset()
+    return obs, info
 
 
 def extract_xy_v(obs: Union[np.ndarray, Dict[str, np.ndarray]]) -> Tuple[float, float, float, float]:
@@ -228,6 +200,9 @@ def collect_rollouts(
     base_seed: int,
     min_return: Optional[float],
     render: bool,
+    random_start: bool,
+    start_cells: Sequence[Tuple[int, int]],
+    rng: np.random.Generator,
 ) -> Dict[str, np.ndarray]:
     data: Dict[str, List[np.ndarray]] = {
         "obs": [],
@@ -247,6 +222,12 @@ def collect_rollouts(
         obs, _ = env.reset(seed=base_seed + ep)
         if isinstance(obs, dict):
             locator.calibrate(obs)
+
+        if random_start:
+            obs, _ = set_random_start(env, locator, start_cells, rng)
+            if isinstance(obs, dict):
+                locator.calibrate(obs)
+
         obs_flat = flatten_goal_observation(obs)
 
         ep_data: Dict[str, List[np.ndarray]] = {
@@ -322,10 +303,10 @@ def collect_rollouts(
     if kept_lengths:
         print(
             f"Collected {len(data['obs'])} transitions "
-            f"({np.mean(kept_lengths):.1f}±{np.std(kept_lengths):.1f} steps/kept-episode)."
+            f"({np.mean(kept_lengths):.1f}+/-{np.std(kept_lengths):.1f} steps/kept-episode)."
         )
         print(
-            f"Average kept return: {np.mean(kept_returns):.2f} ± {np.std(kept_returns):.2f}"
+            f"Average kept return: {np.mean(kept_returns):.2f} +/- {np.std(kept_returns):.2f}"
         )
     else:
         print("No episodes satisfied min_return; dataset is empty.")
@@ -333,7 +314,7 @@ def collect_rollouts(
     print(
         f"Summary: kept {len(kept_lengths)} / {episodes} episodes, "
         f"skipped {skipped} (min_return={min_return}). "
-        f"All episodes average return: {np.mean(all_returns):.2f} ± {np.std(all_returns):.2f}"
+        f"All episodes average return: {np.mean(all_returns):.2f} +/- {np.std(all_returns):.2f}"
     )
 
     return {
@@ -352,40 +333,33 @@ def main() -> None:
     maze_map = load_maze(args.maze_file)
     reward_map = load_reward_map(args.reward_file)
 
-    if args.upper_left_random:
-        # 模式 1：只用左上角隨機起點產生 (row, col) -> action
-        rollouts = collect_random_dataset(
-            maze_map=maze_map,
-            reward_map=reward_map,
-            num_samples=args.num_samples,
-            row_frac=0.5,
-            col_frac=0.5,
-            seed=args.seed,
-        )
-    else:
-        # 模式 2：原本的 rollouts
-        env = gym.make(
-            args.env_id,
-            maze_map=maze_map,
-            max_episode_steps=args.max_steps,
-            render_mode="human" if args.render else None,
-        )
-        env.action_space.seed(args.seed)
+    env = gym.make(
+        args.env_id,
+        maze_map=maze_map,
+        max_episode_steps=args.max_steps,
+        render_mode="human" if args.render else None,
+    )
+    env.action_space.seed(args.seed)
 
-        locator = MazeLocator(env, maze_map)
+    locator = MazeLocator(env, maze_map)
+    start_cells = get_reachable_cells(maze_map) if maze_map is not None else []
+    rng = np.random.default_rng(args.seed)
 
-        rollouts = collect_rollouts(
-            env=env,
-            locator=locator,
-            reward_map=reward_map,
-            episodes=args.episodes,
-            max_steps=args.max_steps,
-            base_seed=args.seed,
-            min_return=args.min_return,
-            render=args.render,
-        )
+    rollouts = collect_rollouts(
+        env=env,
+        locator=locator,
+        reward_map=reward_map,
+        episodes=args.episodes,
+        max_steps=args.max_steps,
+        base_seed=args.seed,
+        min_return=args.min_return,
+        render=args.render,
+        random_start=args.random_start,
+        start_cells=start_cells,
+        rng=rng,
+    )
 
-        env.close()
+    env.close()
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("wb") as f:
