@@ -4,23 +4,13 @@ import numpy as np
 from gymnasium import Wrapper, ActionWrapper
 
 
-def nearest_wall_distance(walls: np.ndarray, x: float, y: float, env) -> float:
+def nearest_wall_distance(x: float, y: float, wall_indices, n_cols, n_rows) -> float:
     """
     walls[i, j] 為 True/1 表示該格是牆，大小為 n x n。
     世界座標範圍為 x, y ∈ [-n/2, n/2]。
     回傳點 (x, y) 到最近一格牆的歐式距離。
     """
-    n_rows, n_cols = walls.shape
-    assert n_rows == n_cols, "這裡假設是正方形迷宮"
-    n = n_rows
 
-    wall_indices = []
-    # 找出所有牆的 index
-    for i, row in enumerate(walls):
-        for j, entry in enumerate(row):
-            if entry == "1":
-                wall_indices.append([i, j])
-    wall_indices = np.array(wall_indices)
     if wall_indices.size == 0:
         return math.inf  # 沒有牆
 
@@ -91,6 +81,16 @@ class MazeWrapper(Wrapper):
         self.success = False
         if maze:
             self.maze = np.asarray(maze)
+            self.n_rows, self.n_cols = self.maze.shape
+
+            wall_indices = []
+            # 找出所有牆的 index
+            for i, row in enumerate(self.maze):
+                for j, entry in enumerate(row):
+                    if entry == "1":
+                        wall_indices.append([i, j])
+            self.wall_indices = np.array(wall_indices)
+
         self.touch_wall_distance = touch_wall_distance
 
     def step(self, action):
@@ -101,8 +101,10 @@ class MazeWrapper(Wrapper):
         vx = obs[2]
         vy = obs[3]
 
-        if self.maze is not None:
-            dist = nearest_wall_distance(self.maze, x, y, self.env)
+        if self.wall_indices is not None:
+            dist = nearest_wall_distance(
+                x, y, self.wall_indices, self.n_cols, self.n_rows
+            )
             if dist < 0.15:
                 info["touched_wall"] = True
                 terminated = True
@@ -149,4 +151,3 @@ class NoisyActionWrapper(ActionWrapper):
         self.enabled = enabled
         if noise_scale is not None:
             self.noise_scale = noise_scale
-
