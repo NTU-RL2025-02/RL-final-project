@@ -98,7 +98,9 @@ def flatten_observation(obs: Sequence | dict) -> np.ndarray:
 class MazeLocator:
     def __init__(self, env: gym.Env, maze_map: Optional[list]):
         self.env = env
-        self.maze_map = np.array(maze_map, dtype=object) if maze_map is not None else None
+        self.maze_map = (
+            np.array(maze_map, dtype=object) if maze_map is not None else None
+        )
         shape = self.maze_map.shape if self.maze_map is not None else (0, 0)
         self.grid_rows, self.grid_cols = shape if shape else (0, 0)
         self._cell_size = self._extract_cell_size()
