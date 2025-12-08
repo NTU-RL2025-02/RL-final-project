@@ -97,7 +97,7 @@ class MazeWrapper(Wrapper):
 
         if self.maze is not None:
             dist = nearest_wall_distance(self.maze, x, y, self.env)
-            if dist < 0.1:
+            if dist < 0.05:
                 info["touched_wall"] = True
                 terminated = True
 
