@@ -244,7 +244,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output",
         type=Path,
-        default=None,
+        default=None ,
         help="Path to save the plot image. If not provided, the plot will be shown instead.",
     )
 
