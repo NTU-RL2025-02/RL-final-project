@@ -185,16 +185,22 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
-        with h5py.File(os.path.join(logger_kwargs["output_dir"], f"epoch{epoch}_trajectories.hdf5",), "a") as hdf5_trajectories_file:
-            hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/x"] = (
-                np.array(ball_x)
-            )
-            hdf5_trajectories_file[f"testing/epoch{epoch}/episode{episode_idx}/obs/y"] = (
-                np.array(ball_y)
-            )
-        print(
-            f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
-        )
+        with h5py.File(
+            os.path.join(
+                logger_kwargs["output_dir"],
+                f"epoch{epoch}_trajectories.hdf5",
+            ),
+            "a",
+        ) as hdf5_trajectories_file:
+            hdf5_trajectories_file[
+                f"testing/epoch{epoch}/episode{episode_idx}/obs/x"
+            ] = np.array(ball_x)
+            hdf5_trajectories_file[
+                f"testing/epoch{epoch}/episode{episode_idx}/obs/y"
+            ] = np.array(ball_y)
+        # print(
+        #     f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
+        # )
 
     success_rate = sum(reward_list) / num_test_episodes
     data = {
@@ -666,7 +672,7 @@ def thrifty(
             horizon,
             robosuite,
             logger_kwargs,
-            epoch=0
+            epoch=0,
         )
         print("Final Success Rate:", success_rate)
         sys.exit(0)
@@ -779,7 +785,7 @@ def thrifty(
     # 訓練過程中統計資訊
     total_env_interacts = 0  # 環境互動的總步數
     ep_num = 0  # 總 episode 數
-    record_ep_num = 0 # 紀錄 h5py 檔案所用的計數器，不管有沒有done都累加
+    record_ep_num = 0  # 紀錄 h5py 檔案所用的計數器，不管有沒有done都累加
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
     num_switch_to_novel = 0  # 因 novelty 切到 human 次數
@@ -804,7 +810,7 @@ def thrifty(
         logging_data: List[Dict[str, Any]] = []
         estimates: List[float] = []
         estimates2: List[float] = []
-        
+
         while step_count < obs_per_iter:
             expert_policy.start_episode()
             recovery_policy.start_episode()
@@ -978,11 +984,19 @@ def thrifty(
                     "wb",
                 ),
             )
-            with h5py.File(os.path.join(logger_kwargs["output_dir"], f"epoch{epoch_idx}_trajectories.hdf5",), "a") as hdf5_trajectories_file:
-                hdf5_trajectories_file[f"training/episode{record_ep_num}/position"] = np.array(
-                    obs
-                )[:, 0:2]
-                hdf5_trajectories_file[f"training/episode{record_ep_num}/policy"] = np.array(sup)
+            with h5py.File(
+                os.path.join(
+                    logger_kwargs["output_dir"],
+                    f"epoch{epoch_idx}_trajectories.hdf5",
+                ),
+                "a",
+            ) as hdf5_trajectories_file:
+                hdf5_trajectories_file[f"training/episode{record_ep_num}/position"] = (
+                    np.array(obs)[:, 0:2]
+                )
+                hdf5_trajectories_file[f"training/episode{record_ep_num}/policy"] = (
+                    np.array(sup)
+                )
 
             # online 更新 switching thresholds
             if (
@@ -1038,7 +1052,7 @@ def thrifty(
             horizon,
             robosuite,
             logger_kwargs,
-            epoch=epoch_idx
+            epoch=epoch_idx,
         )
         print("Epoch {}: Success Rate {:.3f}".format(epoch_idx, success_rate))
 
@@ -1132,7 +1146,7 @@ def thrifty(
             horizon,
             robosuite,
             logger_kwargs,
-            epoch=iters + 1
+            epoch=iters + 1,
         )
         print("Final Eval (Best Model): Success Rate {:.3f}".format(final_success_rate))
 
