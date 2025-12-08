@@ -13,6 +13,7 @@ import torch
 import wandb
 import h5py
 import os
+from pathlib import Path
 
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
@@ -33,6 +34,7 @@ from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import SAC
 
 os.environ["MUJOCO_GL"] = "egl"
+RULE_EXPERT_DIR = Path(__file__).resolve().parents[1] / "rule-based_expert"
 
 
 class SB3Expert:
@@ -46,6 +48,42 @@ class SB3Expert:
 
     def __call__(self, obs):
         action, _ = self.model.predict(obs, deterministic=True)
+        return np.asarray(action, dtype=np.float32)
+
+
+class RuleBasedExpert:
+    """Wrap the rule-based PointMaze expert to match the expected expert API."""
+
+    def __init__(self, env, maze_file: Path, reward_file: Path):
+        if str(RULE_EXPERT_DIR) not in sys.path:
+            sys.path.append(str(RULE_EXPERT_DIR))
+        import point_maze_rule_based as rb  # type: ignore
+
+        self.rb = rb
+        self.maze_map = rb.load_maze(Path(maze_file))
+        self.reward_map = rb.load_reward_map(Path(reward_file))
+        self.locator = rb.MazeLocator(env, self.maze_map)
+
+    def start_episode(self):
+        return
+
+    def __call__(self, obs):
+        if isinstance(obs, tuple):
+            obs = obs[0]
+        if isinstance(obs, dict):
+            self.locator.calibrate(obs)
+            obs_vec = self.rb.flatten_observation(obs)
+        else:
+            obs_vec = np.asarray(obs, dtype=np.float32).reshape(-1)
+
+        if obs_vec.size < 4:
+            raise ValueError("Observation must contain x, y, vx, vy for rule expert.")
+
+        x, y, vx, vy = obs_vec[:4]
+        r, c = self.locator.world_to_cell(x, y)
+        r = int(np.clip(r, 0, self.reward_map.shape[0] - 1))
+        c = int(np.clip(c, 0, self.reward_map.shape[1] - 1))
+        action = self.rb.direction_to_action(str(self.reward_map[r, c]), vx, vy)
         return np.asarray(action, dtype=np.float32)
 
 
@@ -134,8 +172,13 @@ def main(args):
     max_ep_len = getattr(env, "_max_episode_steps", 1000)
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
-    expert_model = SAC.load(args.expert_policy_file, device=device)
-    expert_pol = SB3Expert(expert_model)
+    if args.use_expert:
+        maze_file = Path(args.rule_maze_file) if args.rule_maze_file else RULE_EXPERT_DIR / "maze_4room.txt"
+        reward_file = Path(args.rule_reward_file) if args.rule_reward_file else RULE_EXPERT_DIR / "maze_4room_reward.txt"
+        expert_pol = RuleBasedExpert(env, maze_file, reward_file)
+    else:
+        expert_model = SAC.load(args.expert_policy_file, device=device)
+        expert_pol = SB3Expert(expert_model)
 
     # ---- 建 recovery policy ----
     recovery_policy = None
@@ -284,6 +327,23 @@ if __name__ == "__main__":
         ),
     )
     parser.set_defaults(skip_bc_pretrain=False)
+    parser.add_argument(
+        "--use_expert",
+        action="store_true",
+        help="Use rule-based PointMaze expert instead of loading a SB3 zip.",
+    )
+    parser.add_argument(
+        "--rule_maze_file",
+        type=str,
+        default=None,
+        help="Optional maze txt for the rule-based expert (defaults to rule-based_expert/maze_4room.txt).",
+    )
+    parser.add_argument(
+        "--rule_reward_file",
+        type=str,
+        default=None,
+        help="Optional reward/direction txt for the rule-based expert (defaults to rule-based_expert/maze_4room_reward.txt).",
+    )
     args = parser.parse_args()
 
     main(args)
