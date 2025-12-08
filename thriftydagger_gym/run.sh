@@ -2,13 +2,13 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="exp_expert_rule_based_test_four_room_noisy=0.2"
+EXP_NAME="exp_expert_rule_based_test_four_room_angle_single_start_noisy=0.2"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
 RECOVERY_TYPE="expert"
-BC_CKPT="models/bc_policy_aawmaze_10.pt"   # 跟剛剛存的一樣路徑
+BC_CKPT="models/bc_policy_rule_based_1000.pt"   # 跟剛剛存的一樣路徑
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -33,7 +33,6 @@ python3 scripts/run_thriftydagger.py \
   --num_test_episodes 100 \
   --fix_thresholds \
   --noisy_scale 0.2 \
-  --bc_checkpoint $BC_CKPT \
   --rule_expert \
   $BASENAME > output_$BASENAME.txt 2>&1
 "
@@ -42,3 +41,7 @@ echo "Started tmux session: $SESSION_NAME"
 echo "Attach with: tmux attach -t $SESSION_NAME"
 
 # Add --skip_bc_pretrain \ after bc_checkpoint... when you have generated the bc model
+#   --save_bc_checkpoint $BC_CKPT \
+#
+  # --bc_checkpoint $BC_CKPT \
+  # --skip_bc_pretrain \
