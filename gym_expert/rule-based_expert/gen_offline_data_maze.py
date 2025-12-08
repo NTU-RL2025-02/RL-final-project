@@ -34,7 +34,7 @@ DEFAULT_ENV_ID = "PointMaze_Large-v3"
 DEFAULT_MAZE_FILE = BASE_DIR / "maze_4room_test.txt"
 DEFAULT_REWARD_FILE = BASE_DIR / "maze_4room_reward.txt"
 DEFAULT_OUTPUT = BASE_DIR / "offline_dataset_rulebased.pkl"
-DEFAULT_EPISODES = 1000
+DEFAULT_EPISODES = 200
 DEFAULT_MAX_STEPS = 1300
 
 

@@ -24,7 +24,7 @@ from thrifty_gym.utils.wrappers import (
     NoisyActionWrapper,
 )
 from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery, ExpertAsRecovery
-from thrifty_gym.maze import FOUR_ROOMS_ANGLE, FOUR_ROOMS_REWARD
+from thrifty_gym.maze import FOUR_ROOMS_ANGLE, FOUR_ROOMS_REWARD, FOUR_ROOMS_ANGLE_SINGLE_START, FOUR_ROOMS_21x21
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
 import gymnasium as gym
@@ -125,11 +125,39 @@ def main(args):
             continuing_task=False,
             reset_target=False,
             render_mode="human" if render else None,
+            maze_map=FOUR_ROOMS_21x21,
+        )
+        env = FlattenObservation(env)
+        env = NoisyActionWrapper(
+            env, noise_scale=args.noisy_scale
+        )
+        env = MazeWrapper(env, FOUR_ROOMS_21x21)  # add success wrapper
+        
+    elif args.environment == "PointMaze_4rooms-v3-angle":
+        env = gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
+            maze_map=FOUR_ROOMS_ANGLE_SINGLE_START,
+        )
+        env = FlattenObservation(env)
+        env = NoisyActionWrapper(
+            env, noise_scale=args.noisy_scale
+        )
+        env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)  # add success wrapper
+
+    elif args.environment == "PointMaze_4rooms-v3-angle-random-start":
+        env = gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_ANGLE,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(
-            env, FOUR_ROOMS_ANGLE, 21, noise_scale=args.noisy_scale
+            env, noise_scale=args.noisy_scale
         )
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE)  # add success wrapper
 
@@ -140,8 +168,10 @@ def main(args):
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
     if args.rule_expert:
+        print("!!! Using rule base expert !!!")
         expert_pol = RuleBasedExpert(FOUR_ROOMS_ANGLE, FOUR_ROOMS_REWARD)
     else:
+        print("!!! Using SAC expert !!!")
         expert_model = SAC.load(args.expert_policy_file, device=device)
         expert_pol = SB3Expert(expert_model)
 

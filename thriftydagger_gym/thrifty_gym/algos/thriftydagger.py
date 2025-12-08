@@ -185,6 +185,7 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
+        print(np.array(ball_traj).shape)
         with h5py.File(
             os.path.join(
                 logger_kwargs["output_dir"],
@@ -193,11 +194,8 @@ def test_agent(
             "a",
         ) as hdf5_trajectories_file:
             hdf5_trajectories_file[
-                f"testing/epoch{epoch}/episode{episode_idx}/obs/x"
-            ] = np.array(ball_x)
-            hdf5_trajectories_file[
-                f"testing/epoch{epoch}/episode{episode_idx}/obs/y"
-            ] = np.array(ball_y)
+                f"testing/epoch{epoch}/episode{episode_idx}/position"
+            ] = np.array(ball_traj)
         # print(
         #     f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
         # )
@@ -957,7 +955,10 @@ def thrifty(
             record_ep_num += 1
             if done:
                 ep_num += 1
-                # === Save per-episode ball trajectory ===
+                print("episode done", flush = True)
+            else:
+                print("episode not done", flush = True)
+            # === Save per-episode ball trajectory ===
 
             total_env_interacts += ep_len
 

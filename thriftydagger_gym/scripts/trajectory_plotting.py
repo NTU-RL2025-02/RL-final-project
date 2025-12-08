@@ -73,9 +73,10 @@ def load_hdf5_trajectories(
                 episode_obs.append(f[f"training/{ep}/position"][()])
                 policy_using.append(f[f"training/{ep}/policy"][()])
         if hdf5_testing_traj:
-            for ep in f["testing"]:
-                episode_obs.append(f[f"testing/{ep}/position"][()])
-                policy_using.append(None)
+            for epoch in f["testing"]:
+                for episode in f[f"testing/{epoch}"]:
+                    episode_obs.append(f[f"testing/{epoch}/{episode}/position"][()])
+                    policy_using.append(None)
         
     return episode_obs, policy_using
 
@@ -93,8 +94,9 @@ def main(
     # 1. 讀 pkl 或 hdf5 並拆成 episodes
     if input_type == "pkl":
         data = load_pkl_rollouts(input_path)
+        print(data)
         episodes_obs = split_pkl_episodes(data)
-        policy_using = [None] * episodes_obs.shape[0]
+        policy_using = [None] * len(episodes_obs)
     elif input_type == "hdf5":
         episodes_obs, policy_using = load_hdf5_trajectories(
             input_path, hdf5_training_traj, hdf5_testing_traj
@@ -106,7 +108,7 @@ def main(
 
     if sample_amount != None:
         idx = np.random.choice(len(episodes_obs), size=sample_amount, replace=False)
-        episodes_obs = episodes_obs[idx]
+        episodes_obs = [episodes_obs[i] for i in idx]
         print(f"Sampled {len(episodes_obs)} episodes from all trajectories")
 
 
@@ -153,7 +155,7 @@ def main(
             plt.scatter(xs[0], ys[0], marker="o", s=8)  # start
             plt.scatter(xs[-1], ys[-1], marker="x", s=8, linewidths=0.5)  # end
         elif input_type == "hdf5":
-            if policy_using[ep_idx] is not None:
+            if policy_using[ep_idx] is None:
                 # testing stage
                 # 畫軌跡線
                 plt.plot(xs, ys, alpha=0.5, linewidth=1)
@@ -231,7 +233,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--maze-layout",
         type=str,
-        default="medium",
+        default="four_rooms",
         help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms'.",
     )
     
