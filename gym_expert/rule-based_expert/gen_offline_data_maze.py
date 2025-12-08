@@ -31,8 +31,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # Defaults mirror point_maze_rule_based.py
 DEFAULT_ENV_ID = "PointMaze_Large-v3"
-DEFAULT_MAZE_FILE = "../maze_4room_test.txt"
-DEFAULT_REWARD_FILE = "../maze_4room_reward.txt"
+DEFAULT_MAZE_FILE = BASE_DIR / "maze_4room_test.txt"
+DEFAULT_REWARD_FILE = BASE_DIR / "maze_4room_reward.txt"
 DEFAULT_OUTPUT = BASE_DIR / "offline_dataset_rulebased.pkl"
 DEFAULT_EPISODES = 200
 DEFAULT_MAX_STEPS = 1300
@@ -95,14 +95,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Render while collecting trajectories.",
     )
-    parser.add_argument(
-        "--upper-left-random",
-        action="store_true",
-        help="If set, build dataset by sampling random cells from the upper-left region of the maze.",
-    )
-
     return parser.parse_args()
-    
+
 
 def flatten_goal_observation(
     obs: Union[np.ndarray, Dict[str, np.ndarray]],
@@ -131,78 +125,6 @@ def flatten_goal_observation(
         return np.concatenate(parts, axis=0).astype(np.float32, copy=False)
 
     return np.asarray(obs, dtype=np.float32)
-
-def collect_random_dataset(
-    maze_map: np.ndarray,
-    reward_map: np.ndarray,
-    num_samples: int,
-    row_frac: float = 0.5,
-    col_frac: float = 0.5,
-    seed: int = 42,
-) -> Dict[str, np.ndarray]:
-    """
-    Build an offline dataset by sampling random reachable cells
-    from the upper-left region of the maze.
-
-    - state: [row, col] (float32)
-    - action: direction_to_action(direction, vx=0, vy=0)
-    """
-    H, W = maze_map.shape
-    max_r = int(H * row_frac)
-    max_c = int(W * col_frac)
-
-    # 收集左上角所有可走 (r, g) 的 cell
-    candidate_cells: List[Tuple[int, int]] = []
-    for r in range(max_r):
-        for c in range(max_c):
-            cell = str(maze_map[r, c])
-            if cell in ("r", "g"):
-                candidate_cells.append((r, c))
-
-    if not candidate_cells:
-        raise ValueError("No reachable cells found in the upper-left region.")
-
-    rng = np.random.default_rng(seed)
-
-    obs_list: List[np.ndarray] = []
-    act_list: List[np.ndarray] = []
-    next_obs_list: List[np.ndarray] = []
-    rew_list: List[float] = []
-    done_list: List[bool] = []
-    ep_start_list: List[bool] = []
-
-    # 從左上角 reachable cells 裡 random 抽 num_samples 個（可重複）
-    indices = rng.integers(low=0, high=len(candidate_cells), size=num_samples)
-    for idx in indices:
-        r, c = candidate_cells[idx]
-
-        # state = (row, col)
-        s = np.array([r, c], dtype=np.float32)
-
-        direction = str(reward_map[r, c])
-        a = direction_to_action(direction, vx=0.0, vy=0.0).astype(np.float32)
-
-        obs_list.append(s)
-        act_list.append(a)
-        # 下面幾個欄位只是為了對齊結構，BC pretrain 通常只用 obs / act
-        next_obs_list.append(s)
-        rew_list.append(0.0)
-        done_list.append(True)
-        ep_start_list.append(True)
-
-    print(
-        f"Upper-left random dataset: {len(obs_list)} state-action pairs "
-        f"from {len(candidate_cells)} candidate cells."
-    )
-
-    return {
-        "obs": np.asarray(obs_list, dtype=np.float32),
-        "act": np.asarray(act_list, dtype=np.float32),
-        "next_observations": np.asarray(next_obs_list, dtype=np.float32),
-        "rew": np.asarray(rew_list, dtype=np.float32),
-        "done": np.asarray(done_list, dtype=bool),
-        "episode_starts": np.asarray(ep_start_list, dtype=bool),
-    }
 
 
 def extract_xy_v(obs: Union[np.ndarray, Dict[str, np.ndarray]]) -> Tuple[float, float, float, float]:
@@ -352,45 +274,33 @@ def main() -> None:
     maze_map = load_maze(args.maze_file)
     reward_map = load_reward_map(args.reward_file)
 
-    if args.upper_left_random:
-        # 模式 1：只用左上角隨機起點產生 (row, col) -> action
-        rollouts = collect_random_dataset(
-            maze_map=maze_map,
-            reward_map=reward_map,
-            num_samples=args.num_samples,
-            row_frac=0.5,
-            col_frac=0.5,
-            seed=args.seed,
-        )
-    else:
-        # 模式 2：原本的 rollouts
-        env = gym.make(
-            args.env_id,
-            maze_map=maze_map,
-            max_episode_steps=args.max_steps,
-            render_mode="human" if args.render else None,
-        )
-        env.action_space.seed(args.seed)
+    env = gym.make(
+        args.env_id,
+        maze_map=maze_map,
+        max_episode_steps=args.max_steps,
+        render_mode="human" if args.render else None,
+    )
+    env.action_space.seed(args.seed)
 
-        locator = MazeLocator(env, maze_map)
+    locator = MazeLocator(env, maze_map)
 
-        rollouts = collect_rollouts(
-            env=env,
-            locator=locator,
-            reward_map=reward_map,
-            episodes=args.episodes,
-            max_steps=args.max_steps,
-            base_seed=args.seed,
-            min_return=args.min_return,
-            render=args.render,
-        )
-
-        env.close()
+    rollouts = collect_rollouts(
+        env=env,
+        locator=locator,
+        reward_map=reward_map,
+        episodes=args.episodes,
+        max_steps=args.max_steps,
+        base_seed=args.seed,
+        min_return=args.min_return,
+        render=args.render,
+    )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("wb") as f:
         pickle.dump(rollouts, f)
     print(f"Saved dataset to {args.output}")
+
+    env.close()
 
 
 if __name__ == "__main__":
