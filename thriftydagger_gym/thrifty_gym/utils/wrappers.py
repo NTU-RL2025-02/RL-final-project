@@ -23,7 +23,8 @@ def nearest_wall_distance(walls: np.ndarray, x: float, y: float, env) -> float:
 
     for i, j in wall_indices:
         # 對應到世界座標的 rectangle
-        x_min, y_max = env.cell_rowcol_to_xy(i, j)
+        x_min = j - n_cols / 2
+        y_max = -i + n_rows / 2
         x_max = x_min + 1.0
         y_min = y_max - 1.0
 
@@ -97,7 +98,7 @@ class MazeWrapper(Wrapper):
 
         if self.maze is not None:
             dist = nearest_wall_distance(self.maze, x, y, self.env)
-            if dist < 0.05:
+            if dist < 0.01:
                 info["touched_wall"] = True
                 terminated = True
 
@@ -115,16 +116,17 @@ class MazeWrapper(Wrapper):
 
 
 class NoisyActionWrapper(ActionWrapper):
-    def __init__(self, 
-            env, 
-            maze_map: List[List[Union[str, int]]],
-            maze_size_scaling: float,
-            noise_scale=0.1, 
-        ):
+    def __init__(
+        self,
+        env,
+        maze_map: List[List[Union[str, int]]],
+        maze_size_scaling: float,
+        noise_scale=0.1,
+    ):
         super().__init__(env)
         self.noise_scale = noise_scale
         self.enabled = True  # 控制要不要加 noise
-        
+
         self.maze_map = maze_map
         self.maze_size_scaling = maze_size_scaling
         self.maze_size_scaling = maze_size_scaling
