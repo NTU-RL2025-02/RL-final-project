@@ -2,13 +2,26 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-EXP_NAME="sanity_check_4room_sac_wall_dead"
+ENVIRONMENT_NAME="PointMaze_4rooms-v3"
 
+FALSE=0
+TRUE=1
+USE_RULE_BASE_EXPERT=$TRUE
+# if USE_RULE_BASE_EXPERT is false, then use following expert policy
+EXPERT_POLICY_PATH="models/experts/best_model_noisy_4rooms"
+DEMONSTRATION_PATH="models/demonstrations/offline_dataset_rulebased.pkl"
+USE_BC_CHECKPOINT=$FALSE
+BC_CHECKPOINT_PATH="models/bc_models/bc_policy_rule_based_4room.pt"
+
+RECOVERY_TYPE="expert"
+NOISY_SCALE="0.0"
+MAX_EXPERT_QUERY="100000"
+TEST_EPISODE_AMOUNT="100"
+
+EXP_NAME="exp_expert_rule_based_four_room_noisy=0.2"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
-RECOVERY_TYPE="expert"
-BC_CKPT="models/bc_sac_4room_wall_dead.pt"
 
 # 檢查 session 是否已存在
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -16,30 +29,53 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
   exit 1
 fi
 
-tmux new-session -d -s "$SESSION_NAME" "
-source ~/.bashrc
-conda activate rl-final
 
-python3 scripts/run_thriftydagger.py \
-  --seed 48763 \
-  --device 0 \
-  --iters 100 \
-  --targetrate 0.01 \
-  --demonstration_set_file models/ofds_4rooms_10.pkl \
-  --max_expert_query 3000 \
-  --environment 'PointMaze_4rooms-v3' \
-  --recovery_type $RECOVERY_TYPE \
-  --num_test_episodes 100 \
-  --fix_thresholds \
-  --noisy_scale 0.0 \
-  $BASENAME > output_$BASENAME.txt 2>&1
-"
+if (( $USE_BC_CHECKPOINT )); then 
+  tmux new-session -d -s "$SESSION_NAME" "
+  source ~/.bashrc
+  conda activate rl-final
+    
+  python3 scripts/run_thriftydagger.py \
+    --seed 48763 \
+    --device 0 \
+    --iters 100 \
+    --targetrate 0.01 \
+    --expert_policy_file $EXPERT_POLICY_PATH \
+    --demonstration_set_file $DEMONSTRATION_PATH \
+    --max_expert_query $MAX_EXPERT_QUERY \
+    --environment $ENVIRONMENT_NAME \
+    --recovery_type $RECOVERY_TYPE \
+    --num_test_episodes $TEST_EPISODE_AMOUNT \
+    --fix_thresholds \
+    --noisy_scale $NOISY_SCALE \
+    --rule_expert $USE_RULE_BASE_EXPERT\
+    --bc_checkpoint $BC_CHECKPOINT_PATH \
+    --skip_bc_pretrain \
+    $BASENAME > output_$BASENAME.txt 2>&1
+  "
+else
+  tmux new-session -d -s "$SESSION_NAME" "
+  source ~/.bashrc
+  conda activate rl-final
+    
+  python3 scripts/run_thriftydagger.py \
+    --seed 48763 \
+    --device 0 \
+    --iters 100 \
+    --targetrate 0.01 \
+    --expert_policy_file $EXPERT_POLICY_PATH \
+    --demonstration_set_file $DEMONSTRATION_PATH \
+    --max_expert_query $MAX_EXPERT_QUERY \
+    --environment $ENVIRONMENT_NAME \
+    --recovery_type $RECOVERY_TYPE \
+    --num_test_episodes $TEST_EPISODE_AMOUNT \
+    --fix_thresholds \
+    --noisy_scale $NOISY_SCALE \
+    --rule_expert $USE_RULE_BASE_EXPERT\
+    --save_bc_checkpoint $BC_CHECKPOINT_PATH
+    $BASENAME > output_$BASENAME.txt 2>&1
+  "
+end
 
 echo "Started tmux session: $SESSION_NAME"
 echo "Attach with: tmux attach -t $SESSION_NAME"
-
-# Add --skip_bc_pretrain \ after bc_checkpoint... when you have generated the bc model
-#   --save_bc_checkpoint $BC_CKPT \
-#
-  # --bc_checkpoint $BC_CKPT \
-  # --skip_bc_pretrain \

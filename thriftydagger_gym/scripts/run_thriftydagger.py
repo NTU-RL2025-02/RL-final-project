@@ -83,7 +83,6 @@ def main(args):
             "expert_policy_file": args.expert_policy_file,
             "demonstration_set_file": args.demonstration_set_file,
             "recovery_type": args.recovery_type,
-            # 新增：記錄 BC 相關設定
             "bc_checkpoint": args.bc_checkpoint,
             "save_bc_checkpoint": args.save_bc_checkpoint,
             "skip_bc_pretrain": args.skip_bc_pretrain,
@@ -166,9 +165,9 @@ def main(args):
     max_ep_len = getattr(env, "_max_episode_steps", 1000)
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
-    if args.rule_expert:
+    if args.rule_expert == 1:
         print("!!! Using rule base expert !!!")
-        expert_pol = RuleBasedExpert(FOUR_ROOMS_ANGLE, FOUR_ROOMS_REWARD)
+        expert_pol = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_REWARD)
     else:
         print("!!! Using SAC expert !!!")
         expert_model = SAC.load(args.expert_policy_file, device=device)
@@ -323,20 +322,8 @@ if __name__ == "__main__":
     parser.set_defaults(skip_bc_pretrain=False)
     parser.add_argument(
         "--rule_expert",
-        action="store_true",
+        type=int,
         help="Use rule-based PointMaze expert instead of loading a SB3 zip.",
-    )
-    parser.add_argument(
-        "--rule_maze_file",
-        type=str,
-        default=None,
-        help="Optional maze txt for the rule-based expert (defaults to rule-based_expert/maze_4room.txt).",
-    )
-    parser.add_argument(
-        "--rule_reward_file",
-        type=str,
-        default=None,
-        help="Optional reward/direction txt for the rule-based expert (defaults to rule-based_expert/maze_4room_reward.txt).",
     )
     args = parser.parse_args()
 
