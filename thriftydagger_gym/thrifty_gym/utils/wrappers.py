@@ -87,7 +87,7 @@ class MazeWrapper(Wrapper):
             # 找出所有牆的 index
             for i, row in enumerate(self.maze):
                 for j, entry in enumerate(row):
-                    if entry == "1":
+                    if entry == 1:
                         wall_indices.append([i, j])
             self.wall_indices = np.array(wall_indices)
 
