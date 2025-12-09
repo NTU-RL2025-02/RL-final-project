@@ -72,10 +72,11 @@ else
     --fix_thresholds \
     --noisy_scale $NOISY_SCALE \
     --rule_expert $USE_RULE_BASE_EXPERT\
-    --save_bc_checkpoint $BC_CHECKPOINT_PATH
+    --save_bc_checkpoint $BC_CHECKPOINT_PATH \
     $BASENAME > output_$BASENAME.txt 2>&1
   "
-end
+fi
 
 echo "Started tmux session: $SESSION_NAME"
 echo "Attach with: tmux attach -t $SESSION_NAME"
+
