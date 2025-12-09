@@ -27,8 +27,8 @@ class RuleBasedExpert:
 
         observation: (x, y, vx, vy)
         """
-        x, y = observation[0], observation[1]
-        v_x, v_y = observation[2], observation[3]
+        x, y = observation[4], observation[5]
+        v_x, v_y = observation[6], observation[7]
         i, j = self.xy_to_cell_rowcol(x, y)
         direction = self.maze_reward[i][j]
 

@@ -20,11 +20,12 @@ import numpy as np
 from stable_baselines3 import SAC
 import gymnasium_robotics
 from gymnasium.wrappers import FlattenObservation
+from thrifty_gym.utils.wrappers import MazeWrapper
 from thrifty_gym.maze import (
     FOUR_ROOMS_ANGLE,
     FOUR_ROOMS_ANGLE_RANDOM_START,
     FOUR_ROOMS_21_21,
-    FOUR_ROOMS_21_21_REWARD
+    FOUR_ROOMS_21_21_REWARD,
 )
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
@@ -94,63 +95,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def flatten_goal_observation(
-    obs: Union[np.ndarray, Dict[str, np.ndarray]],
-) -> np.ndarray:
-    """
-    Convert PointMaze's goal-aware dict observation into a flat numpy array.
-
-    The PointMaze env exposes three keys: ``observation`` (agent state),
-    ``achieved_goal`` (current goal state), and ``desired_goal`` (target state).
-    We concatenate them in a stable order so downstream learners that expect
-    vector inputs (e.g., the BC pretraining code) can consume the data.
-    """
-
-    if isinstance(obs, dict):
-        ordered_keys: Sequence[str] = ("observation", "achieved_goal", "desired_goal")
-        parts: List[np.ndarray] = []
-
-        for key in ordered_keys:
-            if key in obs:
-                parts.append(np.asarray(obs[key], dtype=np.float32).ravel())
-
-        # Include any extra keys (future-proofing) after the known ordering.
-        for key, value in obs.items():
-            if key not in ordered_keys:
-                parts.append(np.asarray(value, dtype=np.float32).ravel())
-
-        if not parts:
-            raise ValueError(
-                "Received a dict observation but found no entries to stack."
-            )
-
-        return np.concatenate(parts, axis=0).astype(np.float32, copy=False)
-
-    return np.asarray(obs, dtype=np.float32)
-
-
-def extract_success(info: Dict[str, Union[bool, np.ndarray]]) -> Optional[bool]:
-    """
-    Mirror eval_point_maze.py to interpret success flags from env infos.
-    Returns True/False when known keys exist, otherwise None.
-    """
-    candidate_keys: Tuple[str, ...] = (
-        "success",
-        "is_success",
-        "goal_achieved",
-        "goal_met",
-        "goal_reached",
-    )
-    for key in candidate_keys:
-        if key in info:
-            value = info[key]
-            try:
-                return bool(np.asarray(value).astype(bool).any())
-            except Exception:
-                return bool(value)
-    return None
-
-
 def collect_rollouts(
     model: SAC | RuleBasedExpert,
     env: gym.Env,
@@ -159,8 +103,7 @@ def collect_rollouts(
     deterministic: bool,
     base_seed: int,
     min_return: Optional[float],
-    rule_base_expert: bool
-    
+    rule_base_expert: bool,
 ) -> Dict[str, np.ndarray]:
     data: Dict[str, List[np.ndarray]] = {
         "obs": [],
@@ -178,7 +121,6 @@ def collect_rollouts(
 
     for ep in range(episodes):
         obs, _ = env.reset(seed=base_seed + ep)
-        obs = flatten_goal_observation(obs)
         ep_data: Dict[str, List[np.ndarray]] = {
             "obs": [],
             "act": [],
@@ -197,10 +139,9 @@ def collect_rollouts(
                 action = model(obs)
             else:
                 action, _ = model.predict(obs, deterministic=deterministic)
-            next_obs_raw, env_reward, terminated, truncated, info = env.step(action)
-            next_obs = flatten_goal_observation(next_obs_raw)
+            next_obs, env_reward, terminated, truncated, info = env.step(action)
 
-            success_flag = extract_success(info)
+            success_flag = env.is_success()
             if success_flag is None and terminated and not truncated:
                 success_flag = True
             if success_flag:
@@ -275,16 +216,17 @@ def collect_rollouts(
 def main() -> None:
     args = parse_args()
 
-    env = FlattenObservation(
-        env=gym.make(
-            "PointMaze_Medium-v3",
-            continuing_task=False,
-            reset_target=False,
-            maze_map=FOUR_ROOMS_21_21,
-            max_episode_steps=args.max_steps,
-            render_mode="human" if args.render else None
-        )
+    env = gym.make(
+        "PointMaze_Medium-v3",
+        continuing_task=False,
+        reset_target=False,
+        maze_map=FOUR_ROOMS_21_21,
+        max_episode_steps=args.max_steps,
+        render_mode="human" if args.render else None,
     )
+    env = FlattenObservation(env)
+    env = MazeWrapper(env, maze=FOUR_ROOMS_21_21, touch_wall_distance=0.15)
+
     env.action_space.seed(args.seed)
 
     if args.rule_base_expert:
@@ -293,7 +235,7 @@ def main() -> None:
         if not args.model.exists():
             raise FileNotFoundError(f"Model file not found: {args.model}")
         model: SAC = SAC.load(str(args.model))
-    
+
     rollouts = collect_rollouts(
         model=model,
         env=env,
@@ -302,7 +244,7 @@ def main() -> None:
         deterministic=args.deterministic,
         base_seed=args.seed,
         min_return=args.min_return,
-        rule_base_expert=args.rule_base_expert, 
+        rule_base_expert=args.rule_base_expert,
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

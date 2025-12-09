@@ -134,7 +134,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
         obs_dict, reward, terminated, truncated, info = self.env.step(action)
         x, y, v_x, v_y = obs_dict["observation"]
 
-        # n_rows, n_cols = self.maze_grid.shape
+        n_rows, n_cols = self.maze_grid.shape
         # if self.wall_indices is not None:
         #     dist = nearest_wall_distance(x, y, self.wall_indices, n_cols, n_rows)
         #     if dist < 0.15:
@@ -145,7 +145,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
         success = False
 
         if reward_map[i][j] == "0":
-            shaped_reward = -1.0
+            shaped_reward = -10.0
         elif reward_map[i][j] == "1":
             shaped_reward = 200.0
             success = True
@@ -164,18 +164,15 @@ class CustomRewardFlattenObservation(FlattenObservation):
         else:
             shaped_reward = 0.0
         
-        if x<0 & y>0:
-            shaped_reward -= 3
-        elif x>0 & y>0:
-            shaped_reward -= 1
-        elif x>0 & y<0:
-            shaped_reward += 1
-        else:
-            shaped_reward += 3
-
-        dist = nearest_wall_distance(x, y, self.wall_indices, n_cols, n_rows)
-        if dist < 0.15:
+        if x<0 and y>0:
+            shaped_reward -= 3.0
+        elif x>0 and y>0:
             shaped_reward -= 1.0
+        elif x>0 and y<0:
+            shaped_reward += 1.0
+        else:
+            shaped_reward += 3.0
+
 
         shaped_reward = 3 * shaped_reward - 5
 
