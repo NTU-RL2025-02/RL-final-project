@@ -166,7 +166,7 @@ def main(args):
         raise NotImplementedError("This environment is not implemented in this script.")
 
     
-    max_ep_len = getattr(env, "_max_episode_steps") 
+    max_ep_len = 1000
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
     if args.rule_expert == 1:
