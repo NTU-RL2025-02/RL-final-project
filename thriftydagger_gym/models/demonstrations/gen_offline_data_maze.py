@@ -20,7 +20,7 @@ import numpy as np
 from stable_baselines3 import SAC
 import gymnasium_robotics
 from gymnasium.wrappers import FlattenObservation
-from thrifty_gym.utils.wrappers import MazeWrapper
+from thrifty_gym.utils.wrappers import NoisyActionWrapper, MazeWrapper
 from thrifty_gym.maze import (
     FOUR_ROOMS_ANGLE,
     FOUR_ROOMS_ANGLE_RANDOM_START,
@@ -103,7 +103,9 @@ def collect_rollouts(
     deterministic: bool,
     base_seed: int,
     min_return: Optional[float],
-    rule_base_expert: bool,
+    rule_base_expert: bool, 
+    render: bool
+    
 ) -> Dict[str, np.ndarray]:
     data: Dict[str, List[np.ndarray]] = {
         "obs": [],
@@ -140,6 +142,8 @@ def collect_rollouts(
             else:
                 action, _ = model.predict(obs, deterministic=deterministic)
             next_obs, env_reward, terminated, truncated, info = env.step(action)
+            if render:
+                env.render()
 
             success_flag = env.is_success()
             if success_flag is None and terminated and not truncated:
@@ -225,10 +229,9 @@ def main() -> None:
         render_mode="human" if args.render else None,
     )
     env = FlattenObservation(env)
-    env = MazeWrapper(env, maze=FOUR_ROOMS_21_21, touch_wall_distance=0.15)
-
+    env = NoisyActionWrapper(env, noise_scale=0.2)
+    env = MazeWrapper(env, FOUR_ROOMS_21_21, touch_wall_distance=0.15)
     env.action_space.seed(args.seed)
-
     if args.rule_base_expert:
         model = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_21_21_REWARD)
     else:
@@ -244,7 +247,8 @@ def main() -> None:
         deterministic=args.deterministic,
         base_seed=args.seed,
         min_return=args.min_return,
-        rule_base_expert=args.rule_base_expert,
+        rule_base_expert=args.rule_base_expert, 
+        render=args.render
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
