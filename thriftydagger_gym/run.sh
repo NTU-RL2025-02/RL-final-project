@@ -18,7 +18,7 @@ NOISY_SCALE="0.2"
 MAX_EXPERT_QUERY="5000"
 TEST_EPISODE_AMOUNT="100"
 
-EXP_NAME="exp_4room_rule_based_pkl_ep5_noise0_noisy=0.2"
+EXP_NAME="exp_4room_rule_based_pkl_ep5_noise0.2_noisy=0.2"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${EXP_NAME}_${TIMESTAMP}"
 SESSION_NAME="pointmaze_$BASENAME"
