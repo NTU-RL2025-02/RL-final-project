@@ -24,7 +24,9 @@ from thrifty_gym.maze import (
     FOUR_ROOMS_ANGLE,
     FOUR_ROOMS_ANGLE_RANDOM_START,
     FOUR_ROOMS_21_21,
+    FOUR_ROOMS_21_21_REWARD
 )
+from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
 
 def parse_args() -> argparse.Namespace:
@@ -78,6 +80,16 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1,
         help="If set, only keep episodes with total return >= this value.",
+    )
+    parser.add_argument(
+        "--rule-base-expert",
+        action="store_true",
+        help="generate dataset for rule based expert.",
+    )
+    parser.add_argument(
+        "--render",
+        action="store_true",
+        help="Render while collecting trajectories.",
     )
     return parser.parse_args()
 
@@ -140,13 +152,15 @@ def extract_success(info: Dict[str, Union[bool, np.ndarray]]) -> Optional[bool]:
 
 
 def collect_rollouts(
-    model: SAC,
+    model: SAC | RuleBasedExpert,
     env: gym.Env,
     episodes: int,
     max_steps: Optional[int],
     deterministic: bool,
     base_seed: int,
     min_return: Optional[float],
+    rule_base_expert: bool
+    
 ) -> Dict[str, np.ndarray]:
     data: Dict[str, List[np.ndarray]] = {
         "obs": [],
@@ -179,7 +193,10 @@ def collect_rollouts(
         truncated = False
 
         while not (terminated or truncated):
-            action, _ = model.predict(obs, deterministic=deterministic)
+            if rule_base_expert:
+                action = model(obs)
+            else:
+                action, _ = model.predict(obs, deterministic=deterministic)
             next_obs_raw, env_reward, terminated, truncated, info = env.step(action)
             next_obs = flatten_goal_observation(next_obs_raw)
 
@@ -258,9 +275,6 @@ def collect_rollouts(
 def main() -> None:
     args = parse_args()
 
-    if not args.model.exists():
-        raise FileNotFoundError(f"Model file not found: {args.model}")
-
     env = FlattenObservation(
         env=gym.make(
             "PointMaze_Medium-v3",
@@ -268,12 +282,18 @@ def main() -> None:
             reset_target=False,
             maze_map=FOUR_ROOMS_21_21,
             max_episode_steps=args.max_steps,
+            render_mode="human" if args.render else None
         )
     )
     env.action_space.seed(args.seed)
 
-    model: SAC = SAC.load(str(args.model))
-
+    if args.rule_base_expert:
+        model = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_21_21_REWARD)
+    else:
+        if not args.model.exists():
+            raise FileNotFoundError(f"Model file not found: {args.model}")
+        model: SAC = SAC.load(str(args.model))
+    
     rollouts = collect_rollouts(
         model=model,
         env=env,
@@ -282,6 +302,7 @@ def main() -> None:
         deterministic=args.deterministic,
         base_seed=args.seed,
         min_return=args.min_return,
+        rule_base_expert=args.rule_base_expert, 
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
