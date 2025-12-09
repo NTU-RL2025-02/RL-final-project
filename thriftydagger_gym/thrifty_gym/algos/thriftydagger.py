@@ -185,7 +185,7 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
-        print(np.array(ball_traj).shape)
+        print(f"Agent testing edisode {episode_idx} done with susccess={success}, terminated={terminated}, tuncated={truncated}, ep_len_lim={ep_len + 1 >= horizon} {horizon} {ep_len}", flush=True)
         with h5py.File(
             os.path.join(
                 logger_kwargs["output_dir"],
@@ -196,9 +196,6 @@ def test_agent(
             hdf5_trajectories_file[
                 f"testing/epoch{epoch}/episode{episode_idx}/position"
             ] = np.array(ball_traj)
-        # print(
-        #     f"[Saved] testing trajectory for epoch {epoch}, episode {episode_idx} -> testing/epoch{epoch}/episode{episode_idx}"
-        # )
 
     success_rate = sum(reward_list) / num_test_episodes
     data = {
@@ -509,7 +506,7 @@ def thrifty(
     batch_size: int = 100,
     logger_kwargs: Dict[str, Any] = dict(),
     num_test_episodes: int = 10,
-    bc_epochs: int = 20,
+    bc_epochs: int = 5,
     input_file: str = "data.pkl",
     device_idx: int = 0,
     expert_policy: Optional[Any] = None,
