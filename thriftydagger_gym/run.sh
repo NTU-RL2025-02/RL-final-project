@@ -8,14 +8,14 @@ FALSE=0
 TRUE=1
 USE_RULE_BASE_EXPERT=$TRUE
 # if USE_RULE_BASE_EXPERT is false, then use following expert policy
-EXPERT_POLICY_PATH="models/experts/best_model_noisy_4rooms"
-DEMONSTRATION_PATH="models/demonstrations/offline_dataset_rulebased.pkl"
+EXPERT_POLICY_PATH="models/experts/best_model_4rooms.zip"
+DEMONSTRATION_PATH="models/demonstrations/4room_rule_base_10_noise_0.2.pkl"
 USE_BC_CHECKPOINT=$FALSE
-BC_CHECKPOINT_PATH="models/bc_models/bc_policy_rule_based_4room.pt"
+BC_CHECKPOINT_PATH="models/bc_models/4room_rule_base_10_noise_0.2.pt"
 
 RECOVERY_TYPE="expert"
 NOISY_SCALE="0.0"
-MAX_EXPERT_QUERY="100000"
+MAX_EXPERT_QUERY="2000"
 TEST_EPISODE_AMOUNT="100"
 
 EXP_NAME="exp_expert_rule_based_four_room_noisy=0.2"
