@@ -101,7 +101,7 @@ def main(args):
             turbulence_power=1.5,
             render_mode="human" if render else None,
         )
-        env = LunarLanderSuccessWrapper(env)  # add success wrapper
+        env = LunarLanderSuccessWrapper(env)
 
     elif args.environment == "PointMaze_UMazeDense-v3":
         env = gym.make(
@@ -111,7 +111,7 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
         )
-        env = MazeWrapper(env)  # add success wrapper
+        env = MazeWrapper(env) 
     elif args.environment == "PointMaze_Medium-v3":
         env = gym.make(
             "PointMaze_Medium-v3",
@@ -121,7 +121,7 @@ def main(args):
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env)  # add success wrapper
+        env = MazeWrapper(env)
 
     elif args.environment == "PointMaze_4rooms-v3":
         env = gym.make(
@@ -130,10 +130,11 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_21_21,
+            max_episode_steps=1000
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env, FOUR_ROOMS_21_21)  # add success wrapper
+        env = MazeWrapper(env, FOUR_ROOMS_21_21)
 
     elif args.environment == "PointMaze_4rooms-v3-angle":
         env = gym.make(
@@ -142,10 +143,11 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_ANGLE_SINGLE_START,
+            max_episode_steps=1000
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)  # add success wrapper
+        env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)
 
     elif args.environment == "PointMaze_4rooms-v3-angle-random-start":
         env = gym.make(
@@ -154,16 +156,17 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_ANGLE,
+            max_episode_steps=1000
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env, FOUR_ROOMS_ANGLE)  # add success wrapper
+        env = MazeWrapper(env, FOUR_ROOMS_ANGLE)
 
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
 
     
-    max_ep_len = 1000
+    max_ep_len = getattr(env, "_max_episode_steps") 
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
     if args.rule_expert == 1:
