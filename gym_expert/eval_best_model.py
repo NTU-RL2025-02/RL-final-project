@@ -16,12 +16,13 @@ import gymnasium_robotics  # noqa: F401  (register PointMaze envs)
 from gymnasium.wrappers import FlattenObservation
 from stable_baselines3 import SAC
 from point_maze_aaw import CustomRewardFlattenObservation
+from thrifty_gym.utils.wrappers import MazeWrapper
 
 
 DEFAULT_MODEL_PATH = Path("logs/PointMaze_Large-v3/best_model.zip")
 DEFAULT_ENV_ID = "PointMaze_Large-v3"
 DEFAULT_EPISODES = 20
-DEFAULT_MAZE_FILE = Path("maze_4room_test.txt")
+DEFAULT_MAZE_FILE = Path("maze_4room.txt")
 DEFAULT_MAX_STEPS = 1300
 
 
@@ -76,18 +77,6 @@ def load_maze(maze_file: Path) -> Optional[list]:
         ]
 
 
-def make_env(
-    env_id: str, maze_map: Optional[list], render_mode: Optional[str]
-) -> gym.Env:
-    env_kwargs = {"render_mode": render_mode}
-    if maze_map is not None:
-        env_kwargs["maze_map"] = maze_map
-        env_kwargs["max_episode_steps"] = DEFAULT_MAX_STEPS
-
-    raw_env = gym.make(env_id, **env_kwargs)
-    return CustomRewardFlattenObservation(raw_env, maze_map=maze_map)
-
-
 def extract_success(info: dict) -> Optional[bool]:
     for key in ("success", "is_success", "goal_achieved", "goal_met", "goal_reached"):
         if key in info:
@@ -109,7 +98,7 @@ def rollout_episode(model: SAC, env: gym.Env, step_limit: int) -> Tuple[bool, bo
         step_count += 1
         action, _ = model.predict(obs, deterministic=True)
         obs, _, terminated, truncated, info = env.step(action)
-        success_flag = extract_success(info)
+        success_flag = env.is_success()
         saw_success_key = saw_success_key or success_flag is not None
         if success_flag:
             print(f"Success detected via info flag. step = {step_count}")
@@ -132,10 +121,12 @@ def main() -> None:
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
     maze_map = load_maze(args.maze_file)
-    env = make_env(
-        env_id=args.env_id,
+
+    env = gym.make(
+        id=args.env_id,
         maze_map=maze_map,
         render_mode="human" if args.render else None,
+        max_episode_steps=args.max_steps,
     )
 
     step_limit = (
@@ -147,6 +138,9 @@ def main() -> None:
         )
         or DEFAULT_MAX_STEPS
     )
+
+    env = FlattenObservation(env)
+    env = MazeWrapper(env, maze=maze_map, touch_wall_distance=0.15)
 
     model = SAC.load(model_path)
 

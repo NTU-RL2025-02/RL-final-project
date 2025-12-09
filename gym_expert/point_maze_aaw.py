@@ -6,7 +6,6 @@ checkpoint callbacks, best-model video recording, and performance plotting.
 
 import os
 import platform
-import math
 from collections import deque
 from importlib.metadata import version
 
@@ -27,7 +26,8 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecVideoRecorder
 
 import matplotlib.pyplot as plt
-import tqdm
+
+from thrifty_gym.utils.wrappers import nearest_wall_distance
 
 
 def safe_version(pkg: str) -> str:
@@ -88,13 +88,10 @@ EVAL_ENVS = 1
 EVAL_FREQ = 3125
 N_EVAL_EPISODES = 10
 
-VIDEO_RECORD_FREQ = 50_000_000
+VIDEO_RECORD_FREQ = 50_000
 
 # Total training steps; Point Maze is sparse so budget generously for expert-quality policy.
 TOTAL_TIMESTEPS = 600_000
-
-# Visual settings
-VIDEO_CAMERA_DISTANCE_SCALE = 3.2  # lift camera higher for clearer recordings
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -119,26 +116,30 @@ class CustomRewardFlattenObservation(FlattenObservation):
         self.grid_rows, self.grid_cols = self.distance_field.shape
         self._cell_size = self._extract_cell_size()
         self._xy_to_rowcol_fn = self._extract_xy_to_rowcol_fn()
-        grid = np.array(self.maze_grid, copy=False)
-        self.maze = grid == 1
-        self._wall_indices = np.argwhere(self.maze) if self.maze is not None else None
-        self._wall_rects_cell_size = None
-        self._wall_x_min = self._wall_x_max = None
-        self._wall_y_min = self._wall_y_max = None
-        self._prepare_wall_rects()
+        wall_indices = []
+        # 找出所有牆的 index
+        for i, row in enumerate(raw_maze_map):
+            for j, entry in enumerate(row):
+                if entry == "1":
+                    wall_indices.append([i, j])
+        self.wall_indices = np.array(wall_indices)
 
     def reset(self, **kwargs):
         obs_dict, info = self.env.reset(**kwargs)
         self._maybe_calibrate_cell_size(obs_dict)
-        self._prepare_wall_rects()
         flat_obs = self.observation(obs_dict)
         return flat_obs, info
 
     def step(self, action):
         obs_dict, reward, terminated, truncated, info = self.env.step(action)
-        v_x, v_y = obs_dict["observation"][2], obs_dict["observation"][3]
-        a_x, a_y = action[0], action[1]
-        x, y = obs_dict["observation"][:2]
+        x, y, v_x, v_y = obs_dict["observation"]
+
+        n_rows, n_cols = self.maze_grid.shape
+        if self.wall_indices is not None:
+            dist = nearest_wall_distance(x, y, self.wall_indices, n_cols, n_rows)
+            if dist < 0.15:
+                info["touched_wall"] = True
+                terminated = True
 
         i, j = self._world_to_cell(x, y)
         success = False
@@ -149,68 +150,28 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = 200.0
             success = True
         elif reward_map[i][j] == "R":
-            shaped_reward = v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) + a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = (v_x - 0.5 * abs(v_y)) / (np.linalg.norm([v_x, v_y]) + 1e-8)
         elif reward_map[i][j] == "L":
-            shaped_reward = -v_x / (np.linalg.norm([v_x, v_y]) + 1e-8) - a_x / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = (-v_x - 0.5 * abs(v_y)) / (
+                np.linalg.norm([v_x, v_y]) + 1e-8
+            )
         elif reward_map[i][j] == "U":
-            shaped_reward = v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)   + a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = (v_y - 0.5 * abs(v_x)) / (np.linalg.norm([v_x, v_y]) + 1e-8)
         elif reward_map[i][j] == "D":
-            shaped_reward = -v_y / (np.linalg.norm([v_x, v_y]) + 1e-8)  - a_y / (np.linalg.norm([a_x, a_y]) + 1e-8)
+            shaped_reward = (-v_y - 0.5 * abs(v_x)) / (
+                np.linalg.norm([v_x, v_y]) + 1e-8
+            )
         else:
             shaped_reward = 0.0
 
-        hit_wall = False
-        proximity_penalty = 0.0
-        slowdown_penalty = 0.0
-        cell_size = self._cell_size or 1.0
-        agent_radius = 0.25 * cell_size  # PointMaze puck radius is about 0.2; keep margin.
-        stop_threshold = agent_radius
-        slowdown_threshold = stop_threshold + 0.6 * cell_size  # start braking before a hairpin turn.
-        if self.maze is not None:
-            dist = self.nearest_wall_distance(self.maze, x, y, self.env)
-
-            if dist < stop_threshold:
-                hit_wall = True
-                info["touched_wall"] = True
-                truncated = True
-            elif dist < slowdown_threshold:
-                gap = slowdown_threshold - dist
-                proximity_penalty = 8.0 * (gap / slowdown_threshold) ** 2  # smooth, bounded penalty
-                speed = np.linalg.norm([v_x, v_y])
-                slowdown_penalty = 0.05 * speed  # discourage carrying speed into tight corners
-
-        if hit_wall:
-            shaped_reward = -100.0
-        else:
-            shaped_reward = 2 * shaped_reward - 1 - proximity_penalty - slowdown_penalty
+        shaped_reward = 10 * shaped_reward - 15
 
         if success:
             terminated = True
             info["is_success"] = True
 
-
         flat_obs = self.observation(obs_dict)
         return flat_obs, shaped_reward, terminated, truncated, info
-    # ----- hit the wall helpers -----
-    def nearest_wall_distance(self, walls: np.ndarray, x: float, y: float, env) -> float:
-        """
-        Return the shortest Euclidean distance from (x, y) to any wall cell rectangle.
-        Walls is a boolean grid aligned with self.maze_grid.
-        """
-        if walls is None:
-            return math.inf
-
-        if self._wall_indices is None or self._wall_indices.size == 0:
-            return math.inf
-
-        self._prepare_wall_rects()
-        dx = np.where(x < self._wall_x_min, self._wall_x_min - x, 0.0)
-        dx = np.where(x > self._wall_x_max, x - self._wall_x_max, dx)
-        dy = np.where(y < self._wall_y_min, self._wall_y_min - y, 0.0)
-        dy = np.where(y > self._wall_y_max, y - self._wall_y_max, dy)
-        dist = np.hypot(dx, dy)
-        return float(dist.min()) if dist.size else math.inf
-
 
     # ----- distance helpers -----
     def _compute_distance_field(self, maze_grid: np.ndarray):
@@ -365,29 +326,6 @@ class CustomRewardFlattenObservation(FlattenObservation):
         return base
 
     # ----- utilities -----
-    def _prepare_wall_rects(self):
-        """Precompute wall rectangle bounds for fast distance queries."""
-        if self.maze is None or self._wall_indices is None:
-            return
-        cell_size = self._cell_size or 1.0
-        if self._wall_rects_cell_size is not None and abs(
-            self._wall_rects_cell_size - cell_size
-        ) < 1e-6:
-            return  # already built for this cell size
-
-        half = cell_size / 2.0
-        centers = np.array(
-            [
-                self._cell_center_from_grid(int(r), int(c), cell_size=cell_size)
-                for r, c in self._wall_indices
-            ]
-        )
-        self._wall_x_min = centers[:, 0] - half
-        self._wall_x_max = centers[:, 0] + half
-        self._wall_y_min = centers[:, 1] - half
-        self._wall_y_max = centers[:, 1] + half
-        self._wall_rects_cell_size = cell_size
-
     @staticmethod
     def _normalize_maze_map(maze_map):
         if maze_map is None:
@@ -419,7 +357,7 @@ class CustomRewardFlattenObservation(FlattenObservation):
 
 
 class RewardAndCameraWrapper(CustomRewardFlattenObservation):
-    def __init__(self, env, maze_map=None, distance=7.0, elevation=-80, azimuth=90):
+    def __init__(self, env, maze_map=None, distance=20.0, elevation=-80, azimuth=90):
         super().__init__(env, maze_map=maze_map)
         self._cam_distance = distance
         self._cam_elevation = elevation
@@ -511,9 +449,9 @@ def main() -> None:
         save_path=os.path.join(LOG_DIR, "checkpoint"),
     )
 
-    # video_callback = PeriodicVideoRecorder(record_freq=VIDEO_RECORD_FREQ)
+    video_callback = PeriodicVideoRecorder(record_freq=VIDEO_RECORD_FREQ)
 
-    # callback_list = CallbackList([checkpoint_callback, eval_callback, video_callback])
+    callback_list = CallbackList([checkpoint_callback, eval_callback, video_callback])
 
     # Initialize SAC
     model = SAC(
@@ -527,7 +465,7 @@ def main() -> None:
     model.learn(
         total_timesteps=TOTAL_TIMESTEPS,
         progress_bar=True,
-        # callback=callback_list,
+        callback=callback_list,
     )
 
     # Save final model

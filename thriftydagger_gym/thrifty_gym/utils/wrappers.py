@@ -76,7 +76,7 @@ class LunarLanderSuccessWrapper(Wrapper):
 
 
 class MazeWrapper(Wrapper):
-    def __init__(self, env, maze=None, touch_wall_distance: float = 0.1):
+    def __init__(self, env, maze=None, touch_wall_distance: float = 0.15):
         super().__init__(env)
         self.success = False
         if maze:
@@ -105,7 +105,7 @@ class MazeWrapper(Wrapper):
             dist = nearest_wall_distance(
                 x, y, self.wall_indices, self.n_cols, self.n_rows
             )
-            if dist < 0.15:
+            if dist < self.touch_wall_distance:
                 info["touched_wall"] = True
                 terminated = True
 
