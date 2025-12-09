@@ -165,16 +165,20 @@ class CustomRewardFlattenObservation(FlattenObservation):
             shaped_reward = 0.0
         
         if x<0 and y>0:
-            shaped_reward -= 3.0
+            shaped_reward -= 7.0
         elif x>0 and y>0:
-            shaped_reward -= 1.0
+            shaped_reward -= 5.0
         elif x>0 and y<0:
-            shaped_reward += 1.0
+            shaped_reward -= 3.0
         else:
-            shaped_reward += 3.0
+            shaped_reward -= 1.0
 
 
         shaped_reward = 3 * shaped_reward - 5
+
+        dist = self.distance_field[i, j]
+        if np.isfinite(dist):
+            shaped_reward += -float(dist)
 
         if success:
             terminated = True
