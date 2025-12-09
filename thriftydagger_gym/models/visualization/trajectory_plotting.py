@@ -94,7 +94,6 @@ def main(
     # 1. 讀 pkl 或 hdf5 並拆成 episodes
     if input_type == "pkl":
         data = load_pkl_rollouts(input_path)
-        print(data)
         episodes_obs = split_pkl_episodes(data)
         policy_using = [None] * len(episodes_obs)
     elif input_type == "hdf5":
@@ -132,7 +131,7 @@ def main(
     height = len(maze)
     for i, row in enumerate(maze):
         for j, cell in enumerate(row):
-            if cell == "1":  # Wall
+            if cell == 1:  # Wall
                 x = j - width / 2
                 y = -i + height / 2
                 plt.fill_between([x, x + 1], [y - 1, y - 1], [y, y], color="yellow")
@@ -213,19 +212,19 @@ if __name__ == "__main__":
     input_group = parser.add_mutually_exclusive_group(required=True)
 
     input_group.add_argument(
-        "--pkl_input",
+        "--pkl",
         type=Path,
         help="Path to the trajectory pkl file.",
     )
 
     input_group.add_argument(
-        "--hdf5_input",
+        "--hdf5",
         type=Path,
         help="Path to the trajectory hdf5 file.",
     )
 
     parser.add_argument(
-        "--output",
+        "--out",
         type=Path,
         default=None,
         help="Path to save the plot image. If not provided, the plot will be shown instead.",
@@ -264,9 +263,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(
-        "pkl" if args.pkl_input is not None else "hdf5",
-        args.pkl_input if args.pkl_input is not None else args.hdf5_input,
-        args.output,
+        "pkl" if args.pkl is not None else "hdf5",
+        args.pkl if args.pkl is not None else args.hdf5,
+        args.out,
         args.maze_layout,
         args.sample_amount,
         args.hdf5_training_traj,
