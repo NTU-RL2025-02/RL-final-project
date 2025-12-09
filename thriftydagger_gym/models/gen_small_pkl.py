@@ -1,8 +1,8 @@
 import pickle, numpy as np
 
-src = "models/offline_dataset_mazeMedium_1000.pkl"  # 你的 1000 檔
-dst = "models/offline_dataset_mazeMedium_100.pkl"  # 要輸出的新檔
-n = 100
+src = "models/offline_dataset_rulebased_10000.pkl"  
+dst = "models/offline_dataset_rulebased_1000.pkl"  
+n = 1000
 
 data = pickle.load(open(src, "rb"))
 num = len(data["obs"])
