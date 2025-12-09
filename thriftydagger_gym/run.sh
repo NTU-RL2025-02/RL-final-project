@@ -9,9 +9,9 @@ TRUE=1
 USE_RULE_BASE_EXPERT=$TRUE
 # if USE_RULE_BASE_EXPERT is false, then use following expert policy
 EXPERT_POLICY_PATH="models/experts/best_model_4rooms.zip"
-DEMONSTRATION_PATH="models/demonstrations/4room_rule_base_5_noise_0.pkl"
+DEMONSTRATION_PATH="models/demonstrations/4room_rule_base_5_noise_0.2.pkl"
 USE_BC_CHECKPOINT=$FALSE
-BC_CHECKPOINT_PATH="models/bc_models/4room_rule_base_5_noise_0.pt"
+BC_CHECKPOINT_PATH="models/bc_models/4room_rule_base_5_noise_0.2.pt"
 
 RECOVERY_TYPE="expert"
 NOISY_SCALE="0.2"
