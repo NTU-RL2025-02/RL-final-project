@@ -26,7 +26,7 @@ from thrifty_gym.utils.wrappers import (
 from thrifty_gym.algos.recovery import FiveQRecovery, QRecovery, ExpertAsRecovery
 from thrifty_gym.maze import (
     FOUR_ROOMS_ANGLE,
-    FOUR_ROOMS_REWARD,
+    FOUR_ROOMS_21_21_REWARD,
     FOUR_ROOMS_ANGLE_SINGLE_START,
     FOUR_ROOMS_21_21,
 )
@@ -167,7 +167,7 @@ def main(args):
 
     if args.rule_expert == 1:
         print("!!! Using rule base expert !!!")
-        expert_pol = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_REWARD)
+        expert_pol = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_21_21_REWARD)
     else:
         print("!!! Using SAC expert !!!")
         expert_model = SAC.load(args.expert_policy_file, device=device)
