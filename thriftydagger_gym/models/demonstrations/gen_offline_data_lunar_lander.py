@@ -10,8 +10,6 @@ The script defaults to loading `lunar_lander_best_model.zip` (trained with SAC)
 and the continuous control environment `LunarLanderContinuous-v2`.
 """
 
-from __future__ import annotations
-
 import argparse
 import pickle
 from pathlib import Path
