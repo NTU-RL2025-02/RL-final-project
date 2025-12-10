@@ -34,9 +34,9 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-    init_eps_H: float = 0.48
+    init_eps_H: float = 0.35
     # Q-risk 初始切回 robot 的 safety 門檻
-    init_eps_R: float = 0.495
+    init_eps_R: float = 0.37
 
 
 @dataclass
@@ -185,7 +185,10 @@ def test_agent(
             ep_len += 1
         ball_x, ball_y = o[0], o[1]
         ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
-        print(f"Agent testing edisode {episode_idx} done with susccess={success}, terminated={terminated}, tuncated={truncated}, ep_len_lim={ep_len + 1 >= horizon} {horizon} {ep_len}", flush=True)
+        print(
+            f"Agent testing edisode {episode_idx} done with susccess={success}, terminated={terminated}, tuncated={truncated}, ep_len_lim={ep_len + 1 >= horizon} {horizon} {ep_len}",
+            flush=True,
+        )
         with h5py.File(
             os.path.join(
                 logger_kwargs["output_dir"],
@@ -434,6 +437,7 @@ def log_epoch(
     success_rate: int,
     total_env_interacts: int,
     online_burden: int,
+    online_burden_recovery: int,
     num_switch_to_novel: int,
     num_switch_to_exp: int,
     num_switch_to_recovery: int,
@@ -464,6 +468,7 @@ def log_epoch(
     print("TotalEnvInteracts", total_env_interacts)
     print("SuccessRate", success_rate)
     print("OnlineBurden", online_burden)
+    print("OnlineBurdenRecovery", online_burden_recovery)
     print("NumSwitchToNov", num_switch_to_novel)
     print("NumSwitchToExpert", num_switch_to_exp)
     print("NumSwitchToRisk", num_switch_to_recovery)
@@ -480,6 +485,7 @@ def log_epoch(
     logger.log_tabular("NumSwitchToRisk", num_switch_to_recovery)
     logger.log_tabular("NumSwitchBack", num_switch_to_robot)
     logger.log_tabular("OnlineBurden", online_burden)
+    logger.log_tabular("OnlineBurdenRecovery", online_burden_recovery)
     logger.log_tabular("Switch2RobotThresh", switch2robot_thresh)
     logger.log_tabular("Switch2HumanThresh", switch2human_thresh)
     logger.log_tabular("Switch2RobotThresh2", switch2robot_thresh2)
@@ -783,6 +789,7 @@ def thrifty(
     record_ep_num = 0  # 紀錄 h5py 檔案所用的計數器，不管有沒有done都累加
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
+    online_burden_recovery = 0  # recovery policy 標註總數
     num_switch_to_novel = 0  # 因 novelty 切到 human 次數
     num_switch_to_exp = 0
     num_switch_to_recovery = 0  # 因 risk 切到 human 次數
@@ -902,6 +909,7 @@ def thrifty(
                     a_recovery = recovery_policy.run(o, a_robot)
                     a_recovery = np.clip(a_recovery, -act_limit, act_limit)
                     replay_buffer.store(o, a_recovery)
+                    online_burden_recovery += 1
                     risk.append(float(ac.safety(o, a_recovery)))
 
                     o2, r, terminated, truncated, _ = env.step(a_recovery)
@@ -952,9 +960,9 @@ def thrifty(
             record_ep_num += 1
             if done:
                 ep_num += 1
-                print("episode done", flush = True)
+                print("episode done", flush=True)
             else:
-                print("episode not done", flush = True)
+                print("episode not done", flush=True)
             # === Save per-episode ball trajectory ===
 
             total_env_interacts += ep_len
@@ -1004,7 +1012,7 @@ def thrifty(
                 target_idx = int((1 - target_rate) * len(estimates))
                 switch2human_thresh = sorted(estimates)[target_idx]
                 switch2human_thresh2 = sorted(estimates2, reverse=True)[target_idx]
-                switch2robot_thresh2 = sorted(estimates2)[int(0.5 * len(estimates))]
+                # switch2robot_thresh2 = sorted(estimates2)[int(0.5 * len(estimates))]
 
                 print(
                     "len(estimates): {}, New switch thresholds: {} {} {}".format(
@@ -1108,6 +1116,7 @@ def thrifty(
             success_rate=success_rate,
             total_env_interacts=total_env_interacts,
             online_burden=online_burden,
+            online_burden_recovery=online_burden_recovery,
             num_switch_to_novel=num_switch_to_novel,
             num_switch_to_exp=num_switch_to_exp,
             num_switch_to_recovery=num_switch_to_recovery,

@@ -26,6 +26,7 @@ from thrifty_gym.maze import (
     FOUR_ROOMS_ANGLE_RANDOM_START,
     FOUR_ROOMS_21_21,
     FOUR_ROOMS_21_21_REWARD,
+    FOUR_ROOMS_21_21_LEFT_UP_RANDOM
 )
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
@@ -224,16 +225,16 @@ def main() -> None:
         "PointMaze_Medium-v3",
         continuing_task=False,
         reset_target=False,
-        maze_map=FOUR_ROOMS_21_21,
+        maze_map=FOUR_ROOMS_21_21_LEFT_UP_RANDOM,
         max_episode_steps=args.max_steps,
         render_mode="human" if args.render else None,
     )
     env = FlattenObservation(env)
     env = NoisyActionWrapper(env, noise_scale=0.2)
-    env = MazeWrapper(env, FOUR_ROOMS_21_21, touch_wall_distance=0.15)
+    env = MazeWrapper(env, FOUR_ROOMS_21_21_LEFT_UP_RANDOM, touch_wall_distance=0.15)
     env.action_space.seed(args.seed)
     if args.rule_base_expert:
-        model = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_21_21_REWARD)
+        model = RuleBasedExpert(FOUR_ROOMS_21_21_LEFT_UP_RANDOM, FOUR_ROOMS_21_21_REWARD)
     else:
         if not args.model.exists():
             raise FileNotFoundError(f"Model file not found: {args.model}")
