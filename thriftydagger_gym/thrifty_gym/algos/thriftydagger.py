@@ -10,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import h5py
+import wandb
 
 import numpy as np
 import torch
@@ -34,9 +35,9 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-    init_eps_H: float = 0.35
+    init_eps_H: float = 0.38
     # Q-risk 初始切回 robot 的 safety 門檻
-    init_eps_R: float = 0.37
+    init_eps_R: float = 0.39
 
 
 @dataclass
@@ -860,6 +861,13 @@ def thrifty(
                 # --------------------------------------------------
                 # 檢查是否需要切到 human：novelty / risk
                 # --------------------------------------------------
+                wandb.log(
+                    {
+                        "step_variance": float(ac.variance(o)),
+                        "step_qrisk": float(ac.safety(o, a_robot)),
+                        "training_step": total_env_interacts + step_count,
+                    },
+                )
                 if not expert_mode and ac.variance(o) > switch2human_thresh:
                     print("Switch to Expert (Novel)")
                     num_switch_to_novel += 1
