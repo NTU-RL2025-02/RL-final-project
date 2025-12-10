@@ -35,9 +35,9 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-    init_eps_H: float = 0.48
+    init_eps_H: float = 0.0
     # Q-risk 初始切回 robot 的 safety 門檻
-    init_eps_R: float = 0.495
+    init_eps_R: float = 0.0
 
 
 @dataclass
@@ -439,6 +439,7 @@ def log_epoch(
     total_env_interacts: int,
     online_burden: int,
     online_burden_recovery: int,
+    total_burden: int,
     num_switch_to_novel: int,
     num_switch_to_exp: int,
     num_switch_to_recovery: int,
@@ -470,6 +471,7 @@ def log_epoch(
     print("SuccessRate", success_rate)
     print("OnlineBurden", online_burden)
     print("OnlineBurdenRecovery", online_burden_recovery)
+    print("TotalBurden", total_burden)
     print("NumSwitchToNov", num_switch_to_novel)
     print("NumSwitchToExpert", num_switch_to_exp)
     print("NumSwitchToRisk", num_switch_to_recovery)
@@ -487,6 +489,7 @@ def log_epoch(
     logger.log_tabular("NumSwitchBack", num_switch_to_robot)
     logger.log_tabular("OnlineBurden", online_burden)
     logger.log_tabular("OnlineBurdenRecovery", online_burden_recovery)
+    logger.log_tabular("TotalBurden", total_burden)
     logger.log_tabular("Switch2RobotThresh", switch2robot_thresh)
     logger.log_tabular("Switch2HumanThresh", switch2human_thresh)
     logger.log_tabular("Switch2RobotThresh2", switch2robot_thresh2)
@@ -791,6 +794,7 @@ def thrifty(
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
     online_burden_recovery = 0  # recovery policy 標註總數
+    total_burden = 0 # Total number of querying the expert
     num_switch_to_novel = 0  # 因 novelty 切到 human 次數
     num_switch_to_exp = 0
     num_switch_to_recovery = 0  # 因 risk 切到 human 次數
@@ -892,6 +896,7 @@ def thrifty(
 
                     replay_buffer.store(o, a_expert)
                     online_burden += 1
+                    total_burden += 1
                     # safety critic 對 expert action 的評分
                     risk.append(float(ac.safety(o, a_expert)))
 
@@ -918,6 +923,8 @@ def thrifty(
                     a_recovery = np.clip(a_recovery, -act_limit, act_limit)
                     replay_buffer.store(o, a_recovery)
                     online_burden_recovery += 1
+                    if recovery_type == "expert":
+                        total_burden += 1
                     risk.append(float(ac.safety(o, a_recovery)))
 
                     o2, r, terminated, truncated, _ = env.step(a_recovery)
@@ -1125,6 +1132,7 @@ def thrifty(
             total_env_interacts=total_env_interacts,
             online_burden=online_burden,
             online_burden_recovery=online_burden_recovery,
+            total_burden = total_burden,
             num_switch_to_novel=num_switch_to_novel,
             num_switch_to_exp=num_switch_to_exp,
             num_switch_to_recovery=num_switch_to_recovery,
