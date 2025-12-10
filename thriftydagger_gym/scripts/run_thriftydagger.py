@@ -29,6 +29,7 @@ from thrifty_gym.maze import (
     FOUR_ROOMS_21_21_REWARD,
     FOUR_ROOMS_ANGLE_SINGLE_START,
     FOUR_ROOMS_21_21,
+    FOUR_ROOMS_21_21_LEFT_UP_RANDOM,
 )
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
@@ -111,7 +112,7 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
         )
-        env = MazeWrapper(env) 
+        env = MazeWrapper(env)
     elif args.environment == "PointMaze_Medium-v3":
         env = gym.make(
             "PointMaze_Medium-v3",
@@ -129,12 +130,12 @@ def main(args):
             continuing_task=False,
             reset_target=False,
             render_mode="human" if render else None,
-            maze_map=FOUR_ROOMS_21_21,
-            max_episode_steps=1000
+            maze_map=FOUR_ROOMS_21_21_LEFT_UP_RANDOM,
+            max_episode_steps=1000,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env, FOUR_ROOMS_21_21)
+        env = MazeWrapper(env, FOUR_ROOMS_21_21_LEFT_UP_RANDOM, touch_wall_distance=0.3)
 
     elif args.environment == "PointMaze_4rooms-v3-angle":
         env = gym.make(
@@ -143,7 +144,7 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_ANGLE_SINGLE_START,
-            max_episode_steps=1000
+            max_episode_steps=1000,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
@@ -156,7 +157,7 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_ANGLE,
-            max_episode_steps=1000
+            max_episode_steps=1000,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
@@ -165,7 +166,6 @@ def main(args):
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
 
-    
     max_ep_len = 1000
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
