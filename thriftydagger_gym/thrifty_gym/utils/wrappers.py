@@ -87,7 +87,7 @@ class MazeWrapper(Wrapper):
             # 找出所有牆的 index
             for i, row in enumerate(self.maze):
                 for j, entry in enumerate(row):
-                    if entry == 1:
+                    if entry == "1" or entry == 1:
                         wall_indices.append([i, j])
             self.wall_indices = np.array(wall_indices)
 
@@ -96,10 +96,10 @@ class MazeWrapper(Wrapper):
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
 
-        x = obs[0]
-        y = obs[1]
-        vx = obs[2]
-        vy = obs[3]
+        x = obs[4]
+        y = obs[5]
+        vx = obs[6]
+        vy = obs[7]
 
         if self.wall_indices is not None:
             dist = nearest_wall_distance(

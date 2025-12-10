@@ -9,18 +9,18 @@ TRUE=1
 USE_RULE_BASE_EXPERT=$TRUE
 # if USE_RULE_BASE_EXPERT is false, then use following expert policy
 EXPERT_POLICY_PATH="models/experts/best_model_4rooms.zip"
-DEMONSTRATION_PATH="models/demonstrations/4room_rule_base_5_noise_0.pkl"
+DEMONSTRATION_PATH="models/demonstrations/offline_data_100.pkl"
 USE_BC_CHECKPOINT=$FALSE
 BC_CHECKPOINT_PATH="models/bc_models/4room_rule_base_5_noise_0.pt"
 
 RECOVERY_TYPE="expert"
-NOISY_SCALE="0.2"
+NOISY_SCALE="0.5"
 MAX_EXPERT_QUERY="5000"
 TEST_EPISODE_AMOUNT="100"
 
-EXP_NAME="exp_4room_rule_based_pkl_ep5_noise0_noisy=0.2"
+EXP_NAME="4room_test_hit_wall"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BASENAME="${EXP_NAME}_${TIMESTAMP}"
+BASENAME="${TIMESTAMP}_${EXP_NAME}"
 SESSION_NAME="pointmaze_$BASENAME"
 
 # 檢查 session 是否已存在
@@ -48,7 +48,7 @@ if (( $USE_BC_CHECKPOINT )); then
     --num_test_episodes $TEST_EPISODE_AMOUNT \
     --fix_thresholds \
     --noisy_scale $NOISY_SCALE \
-    --rule_expert $USE_RULE_BASE_EXPERT\
+    --rule_expert $USE_RULE_BASE_EXPERT \
     --bc_checkpoint $BC_CHECKPOINT_PATH \
     --skip_bc_pretrain \
     $BASENAME > output_$BASENAME.txt 2>&1
