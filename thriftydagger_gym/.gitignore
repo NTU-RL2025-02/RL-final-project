@@ -12,3 +12,4 @@ plots/
 wandb/
 nohup.out
 output*.txt
+job*.sh
