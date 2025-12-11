@@ -857,10 +857,8 @@ def thrifty(
                 )
                 s_flag = False
 
-                if not expert_mode:
-                    # 只有在非 expert_mode 時才把 variance / safety 納入 estimates，避免重複計算
-                    estimates.append(ac.variance(o))
-                    estimates2.append(ac.safety(o, a_robot))
+                estimates.append(ac.variance(o))
+                estimates2.append(ac.safety(o, a_robot))
 
                 # --------------------------------------------------
                 # 檢查是否需要切到 human：novelty / risk
@@ -1024,8 +1022,8 @@ def thrifty(
                 len(estimates) > threshold_cfg.min_estimates_for_update
                 and not fix_thresholds
             ):
-                target_idx = int((1 - target_rate) * len(estimates))
-                switch2human_thresh = sorted(estimates)[target_idx]
+                target_idx = int((1 - target_rate) * len(estimates2))
+                # switch2human_thresh = sorted(estimates)[target_idx]
                 switch2human_thresh2 = sorted(estimates2, reverse=True)[target_idx]
                 # switch2robot_thresh2 = sorted(estimates2)[int(0.5 * len(estimates))]
 
