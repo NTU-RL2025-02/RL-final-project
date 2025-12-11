@@ -35,9 +35,9 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-    init_eps_H: float = 0.0
+    init_eps_H: float = 0.48
     # Q-risk 初始切回 robot 的 safety 門檻
-    init_eps_R: float = 0.0
+    init_eps_R: float = 0.495
 
 
 @dataclass
@@ -870,13 +870,14 @@ def thrifty(
                         "training_step": total_env_interacts + step_count,
                     },
                 )
-                if not expert_mode and ac.variance(o) > switch2human_thresh:
-                    print("Switch to Expert (Novel)")
-                    num_switch_to_novel += 1
-                    num_switch_to_exp += 1
-                    expert_mode = True
+                # if not expert_mode and ac.variance(o) > switch2human_thresh:
+                #     print("Switch to Expert (Novel)")
+                #     num_switch_to_novel += 1
+                #     num_switch_to_exp += 1
+                #     expert_mode = True
 
-                elif (
+                # el
+                if (
                     not (expert_mode or safety_mode)
                     and ac.safety(o, a_robot) < switch2human_thresh2
                 ):
