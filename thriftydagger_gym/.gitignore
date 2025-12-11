@@ -13,3 +13,4 @@ wandb/
 nohup.out
 output*.txt
 job*.sh
+test-rollouts.pkl
