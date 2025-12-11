@@ -1038,7 +1038,10 @@ def thrifty(
             )
             data = pickle.load(open("test-rollouts.pkl", "rb"))
             qbuffer.fill_buffer(data)
-            os.remove("test-rollouts.pkl")
+            try:
+                os.remove("test-rollouts.pkl")
+            except OSError:
+                pass
 
         avg_loss_q = retrain_qrisk(
             ac,

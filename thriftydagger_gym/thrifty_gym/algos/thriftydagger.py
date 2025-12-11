@@ -794,7 +794,7 @@ def thrifty(
     fail_ct = 0  # 失敗 episode 數（超過 horizon）
     online_burden = 0  # supervisor 標註總數
     online_burden_recovery = 0  # recovery policy 標註總數
-    total_burden = 0 # Total number of querying the expert
+    total_burden = 0  # Total number of querying the expert
     num_switch_to_novel = 0  # 因 novelty 切到 human 次數
     num_switch_to_exp = 0
     num_switch_to_recovery = 0  # 因 risk 切到 human 次數
@@ -1094,9 +1094,12 @@ def thrifty(
         # 10-3. retrain Q-risk safety critic
         # --------------------------------------------------
 
-        data = pickle.load(open("test-rollouts.pkl", "rb"))
-        qbuffer.fill_buffer(data)
-        os.remove("test-rollouts.pkl")
+        try:
+            data = pickle.load(open("test-rollouts.pkl", "rb"))
+            qbuffer.fill_buffer(data)
+            os.remove("test-rollouts.pkl")
+        except OSError:
+            pass
 
         avg_loss_q = retrain_qrisk(
             ac,
@@ -1132,7 +1135,7 @@ def thrifty(
             total_env_interacts=total_env_interacts,
             online_burden=online_burden,
             online_burden_recovery=online_burden_recovery,
-            total_burden = total_burden,
+            total_burden=total_burden,
             num_switch_to_novel=num_switch_to_novel,
             num_switch_to_exp=num_switch_to_exp,
             num_switch_to_recovery=num_switch_to_recovery,
