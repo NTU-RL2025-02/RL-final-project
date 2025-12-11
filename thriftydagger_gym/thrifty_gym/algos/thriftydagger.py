@@ -527,7 +527,7 @@ def thrifty(
     gym_cfg: Optional[Dict[str, Any]] = None,
     gamma: float = 0.9999,
     init_model: Optional[str] = None,
-    max_expert_query: int = 2000,
+    max_expert_query: int = 50000,
     recovery_type: str = "five_q",
     recovery_kwargs: Dict[str, Any] = dict(),
     fix_thresholds: bool = False,
@@ -1148,7 +1148,7 @@ def thrifty(
         # --------------------------------------------------
         # 10-5. 早停條件：supervisor label 達上限
         # --------------------------------------------------
-        if num_switch_to_exp >= max_expert_query:
+        if total_burden >= max_expert_query:
             print("Reached max expert queries, stopping training.")
             break
 

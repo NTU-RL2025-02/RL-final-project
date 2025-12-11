@@ -13,12 +13,12 @@ DEMONSTRATION_PATH="models/demonstrations/offline_data_100.pkl"
 USE_BC_CHECKPOINT=$TRUE
 BC_CHECKPOINT_PATH="models/bc_models/4room_rule_base_100_noise_0.pt"
 
-RECOVERY_TYPE="q"
+RECOVERY_TYPE="five_q"
 NOISY_SCALE="1.0"
 MAX_EXPERT_QUERY="5000"
 TEST_EPISODE_AMOUNT="100"
 
-EXP_NAME="4room_no_risk_q"
+EXP_NAME="4room_no_risk_five_q"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${TIMESTAMP}_${EXP_NAME}"
 SESSION_NAME="pointmaze_$BASENAME"

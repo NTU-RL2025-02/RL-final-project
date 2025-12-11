@@ -252,7 +252,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_expert_query",
         type=int,
-        default=2000,
+        default=50000,
         help="maximum number of expert queries allowed",
     )
     parser.add_argument("--environment", type=str, default="PointMaze_Medium-v3")
