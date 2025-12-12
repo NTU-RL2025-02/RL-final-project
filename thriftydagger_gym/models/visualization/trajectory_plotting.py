@@ -81,7 +81,7 @@ def load_hdf5_trajectories(
     return episode_obs, policy_using
 
 
-def main(
+def plot(
     input_type: str,
     input_path: Path,
     output_path: Path = None,
@@ -167,7 +167,6 @@ def main(
                 # training stage
                 previous_policy = policy_using[ep_idx][0]
                 x_seg, y_seg = [xs[0]], [ys[0]]
-                print(xs, ys)
                 for i, xyp in enumerate(zip(xs[1:], ys[1:], policy_using[ep_idx])):
                     x, y, p = xyp
                     x_seg.append(x)
@@ -262,7 +261,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    main(
+    plot(
         "pkl" if args.pkl is not None else "hdf5",
         args.pkl if args.pkl is not None else args.hdf5,
         args.out,
