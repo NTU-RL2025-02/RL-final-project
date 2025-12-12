@@ -870,14 +870,13 @@ def thrifty(
                         "training_step": total_env_interacts + step_count,
                     },
                 )
-                # if not expert_mode and ac.variance(o) > switch2human_thresh:
-                #     print("Switch to Expert (Novel)")
-                #     num_switch_to_novel += 1
-                #     num_switch_to_exp += 1
-                #     expert_mode = True
+                if not expert_mode and ac.variance(o) > switch2human_thresh:
+                    print("Switch to Expert (Novel)")
+                    num_switch_to_novel += 1
+                    num_switch_to_exp += 1
+                    expert_mode = True
 
-                # el
-                if (
+                elif (
                     not (expert_mode or safety_mode)
                     and ac.safety(o, a_robot) < switch2human_thresh2
                 ):
