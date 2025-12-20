@@ -32,8 +32,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # Defaults mirror point_maze_rule_based.py
 DEFAULT_ENV_ID = "PointMaze_Large-v3"
-DEFAULT_MAZE_FILE = BASE_DIR / "maze_4room.txt"
-DEFAULT_REWARD_FILE = BASE_DIR / "maze_4room_reward.txt"
+DEFAULT_MAZE_FILE = BASE_DIR.parent / "maze_4room.txt"
+DEFAULT_REWARD_FILE = BASE_DIR.parent / "maze_4room_reward.txt"
 DEFAULT_OUTPUT = BASE_DIR / "offline_dataset_rulebased.pkl"
 DEFAULT_EPISODES = 200
 DEFAULT_MAX_STEPS = 1300
