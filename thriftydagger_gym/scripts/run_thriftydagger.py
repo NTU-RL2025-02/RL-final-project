@@ -30,6 +30,8 @@ from thrifty_gym.maze import (
     FOUR_ROOMS_ANGLE_SINGLE_START,
     FOUR_ROOMS_21_21,
     FOUR_ROOMS_21_21_LEFT_UP_RANDOM,
+    COMPLICATED_MAZE,
+    COMPLICATED_MAZE_REWARD,
 )
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
@@ -136,6 +138,19 @@ def main(args):
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_21_21_LEFT_UP_RANDOM, touch_wall_distance=0.3)
+    
+    elif args.environment == "PointMaze_Complicated-v3":
+        env = gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
+            maze_map=COMPLICATED_MAZE,
+            max_episode_steps=1200,
+        )
+        env = FlattenObservation(env)
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
+        env = MazeWrapper(env, COMPLICATED_MAZE, touch_wall_distance=0.3)
 
     elif args.environment == "PointMaze_4rooms-v3-angle":
         env = gym.make(
@@ -165,13 +180,12 @@ def main(args):
 
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
-
     max_ep_len = 1000
     gym_cfg = {"MAX_EP_LEN": max_ep_len}
 
     if args.rule_expert == 1:
         print("!!! Using rule base expert !!!")
-        expert_pol = RuleBasedExpert(FOUR_ROOMS_21_21, FOUR_ROOMS_21_21_REWARD)
+        expert_pol = RuleBasedExpert(COMPLICATED_MAZE, COMPLICATED_MAZE_REWARD)
     else:
         print("!!! Using SAC expert !!!")
         expert_model = SAC.load(args.expert_policy_file, device=device)
@@ -210,6 +224,7 @@ def main(args):
             save_bc_checkpoint=args.save_bc_checkpoint,
             skip_bc_pretrain=args.skip_bc_pretrain,
             fix_thresholds=args.fix_thresholds,
+            risk_probe=args.risk_probe
         )
     except Exception:
         wandb.finish(exit_code=1)
@@ -329,6 +344,12 @@ if __name__ == "__main__":
         type=int,
         help="Use rule-based PointMaze expert instead of loading a SB3 zip.",
     )
+    parser.add_argument(
+        "--risk-probe",
+        action="store_true",
+        dest="risk_probe",
+    )
+    parser.set_defaults(risk_probe=False)
     args = parser.parse_args()
 
     main(args)
