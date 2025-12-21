@@ -108,6 +108,7 @@ class MazeWrapper(Wrapper):
             if dist < self.touch_wall_distance:
                 info["touched_wall"] = True
                 terminated = True
+                reward = -1.0
 
         # FIXME: I am not sure whether to put "and done" here
         self.success = reward > 0

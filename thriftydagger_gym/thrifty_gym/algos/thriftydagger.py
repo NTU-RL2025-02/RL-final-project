@@ -35,9 +35,9 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-    init_eps_H: float = 0.48
+g    init_eps_H: float = 0.32
     # Q-risk 初始切回 robot 的 safety 門檻
-    init_eps_R: float = 0.495
+    init_eps_R: float = 0.34
 
 
 @dataclass
@@ -385,6 +385,62 @@ def retrain_policy(
     avg_loss_pi = sum(loss_pi_vals) / len(loss_pi_vals) if loss_pi_vals else None
     return ac, pi_optimizers, avg_loss_pi
 
+def retrain_qrisk_monte_carlo(
+    ac: Any,
+    ac_targ: Any,
+    qbuffer: QReplayBuffer,
+    num_test_episodes: int,
+    expert_policy: Any,
+    recovery_policy: Any,
+    env: Any,
+    act_limit: float,
+    horizon: int,
+    robosuite: bool,
+    logger_kwargs: Dict[str, Any],
+    pi_lr: float,
+    bc_epochs: int,
+    grad_steps: int,
+    gamma: float,
+    batch_size: int,
+    qrisk_cfg: QRiskConfig,
+    epoch_idx: int,
+    risk_probe: bool, 
+    epoch_data
+) -> Optional[float]:
+    """
+    若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
+    否則回傳 None。
+    """
+
+    # 重新設定 Q-network optimizer
+    q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
+    q_optimizer = Adam(q_params, lr=pi_lr)
+
+    loss_q_vals: List[float] = []
+    q_batch_size = int(batch_size * qrisk_cfg.q_batch_scale)
+
+    # for episode in epoch_data:
+    #     obs = torch.as_tensor(episode["obs"][:-1], dtype=torch.float32, device="cuda")
+    #     act = torch.as_tensor(episode["act"][:-1], dtype=torch.float32, device="cuda")
+    #     obs2 = torch.as_tensor(np.concatenate([episode["obs"][1:], [0]]), dtype=torch.float32, device="cuda")
+    #     rew = torch.as_tensor(episode["rew"][:-1], dtype=torch.float32, device="cuda")
+    #     done = torch.as_tensor(episode["done"][:-1], dtype=torch.float32, device="cuda")
+
+    #     loss_q_vals.append(
+    #         update_q(ac, ac_targ, q_optimizer, [obs, act, obs2, rew, done], gamma, timer=0)
+    #     )
+
+    for _ in range(bc_epochs):
+        for step_idx in range(grad_steps * qrisk_cfg.q_grad_multiplier):
+            batch = qbuffer.sample_batch(
+                q_batch_size, pos_fraction=qrisk_cfg.pos_fraction
+            )
+            loss_q_vals.append(
+                update_q(ac, ac_targ, q_optimizer, batch, gamma, timer=step_idx)
+            )
+
+    avg_loss_q = sum(loss_q_vals) / len(loss_q_vals) if loss_q_vals else None
+    return avg_loss_q
 
 def retrain_qrisk(
     ac: Any,
@@ -405,6 +461,7 @@ def retrain_qrisk(
     batch_size: int,
     qrisk_cfg: QRiskConfig,
     epoch_idx: int,
+    risk_probe: bool, 
 ) -> Optional[float]:
     """
     若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
@@ -534,6 +591,7 @@ def thrifty(
     bc_checkpoint: Optional[str] = None,
     save_bc_checkpoint: Optional[str] = None,
     skip_bc_pretrain: bool = False,
+    risk_probe: bool = False
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -807,6 +865,7 @@ def thrifty(
     best_model: Optional[Any] = None
 
     for epoch_idx in range(iters + 1):
+        epoch_data = []
         # --------------------------------------------------
         # 10-1. 線上資料收集（epoch 0 跳過，保留給純 Q-training）
         # --------------------------------------------------
@@ -899,14 +958,14 @@ def thrifty(
                     risk.append(float(ac.safety(o, a_expert)))
 
                     o2, r, terminated, truncated, _ = env.step(a_expert)
-                    done = terminated or truncated
                     episode_reward += r
                     s_flag = env.is_success()
+                    done = terminated or truncated or s_flag or (ep_len + 1 >= horizon)
 
                     act.append(a_expert)
                     sup.append(1)  # 1 = supervised expert mode (controlled by expert)
 
-                    qbuffer.store(o, a_expert, o2, int(s_flag), done)
+                    qbuffer.store(o, a_expert, o2, r, done)
 
                     if np.sum((a_robot - a_expert) ** 2) < switch2robot_thresh:
                         print("Switch to Robot from Novelty")
@@ -934,7 +993,7 @@ def thrifty(
                     sup.append(
                         2
                     )  # 2 = supervised safety mode (controlled by recovery policy)
-                    qbuffer.store(o, a_recovery, o2, int(s_flag), done)
+                    qbuffer.store(o, a_recovery, o2, r, done)
 
                     if ac.safety(o, a_robot) > switch2robot_thresh2:
                         print("Switch to Robot from Recovery")
@@ -954,7 +1013,7 @@ def thrifty(
                     act.append(a_robot)
                     sup.append(0)
 
-                    qbuffer.store(o, a_robot, o2, int(s_flag), done)
+                    qbuffer.store(o, a_robot, o2, r, done)
 
                 done_flags.append(done)
                 rew.append(int(s_flag))
@@ -995,6 +1054,13 @@ def thrifty(
                 "simstates": np.array(simstates) if robosuite else None,
             }
             logging_data.append(episode_dict)
+
+            epoch_data.append({
+                "obs" : np.array(obs), 
+                "act" : np.array(act),
+                "rew" : np.array(rew), 
+                "done" : np.array(done)
+            })
 
             pickle.dump(
                 logging_data,
@@ -1099,7 +1165,7 @@ def thrifty(
         except OSError:
             pass
 
-        avg_loss_q = retrain_qrisk(
+        avg_loss_q = retrain_qrisk_monte_carlo(
             ac,
             ac_targ,
             qbuffer,
@@ -1118,6 +1184,8 @@ def thrifty(
             batch_size,
             qrisk_cfg,
             epoch_idx,
+            risk_probe, 
+            epoch_data
         )
 
         # --------------------------------------------------
