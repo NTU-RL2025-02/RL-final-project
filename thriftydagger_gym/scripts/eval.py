@@ -1,3 +1,16 @@
+"""
+scripts/eval.py
+Evaluation script for RecoveryDagger in maze environments.
+Used to evaluate trained policies and visualize Q-value heatmaps.
+Usage:
+    python eval.py <path_to_trained_model.pt> [--environment MAZE_NAME] [--iters N] [--render] [--q_heatmap]
+Options:
+    --environment MAZE_NAME : Name of the maze environment to evaluate on. Choices: PointMaze_4rooms-v3, PointMaze_Complicated-v3, PointMaze_4rooms-v3-angle, PointMaze_4rooms-v3-angle-single-start
+    --iters N               : Number of evaluation iterations (default: 100)
+    --render                : Whether to render the environment during evaluation
+    --q_heatmap             : Whether to draw Q-value heatmap
+"""
+
 from typing import Any
 import numpy as np
 import torch
@@ -40,6 +53,7 @@ def eval(
 
     for iter in trange(total_iterations):
         np.random.seed(iter)
+        torch.manual_seed(iter)
         ball_traj = []
         episode_len = 0.0
         o, _ = env.reset()
@@ -76,29 +90,49 @@ def ij_to_xy(i, j, maze):
 
 
 def draw_q_heatmap(ac, maze, obs0):
+    np.random.seed(0)
+    torch.manual_seed(0)
     width = len(maze[0])
     height = len(maze)
-    actions = [(1, 0), (0, 1), (-1, 0), (0, -1)]
-    q_table = np.zeros((height, width, len(actions)))
+    resolution = 20
+    actions = [
+        (-1, 1),
+        (0, 1),
+        (1, 1),
+        (-1, 0),
+        (0, 0),
+        (1, 0),
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+    ]
+    q_table = np.zeros((height * resolution, width * resolution, len(actions)))
 
-    for i in range(height):
+    for i in trange(height):
         for j in range(width):
             if maze[i][j] == 1 or maze[i][j] == "1":
                 continue
             obs = obs0.copy()
             x, y = ij_to_xy(i, j, maze)
-            obs[4] = x
-            obs[5] = y
-            obs[6] = 0
-            obs[7] = 0
-            for a_idx, a in enumerate(actions):
-                q_value = ac.safety(obs, a)
-                q_table[i, j, a_idx] = q_value
+            for di in range(resolution):
+                for dj in range(resolution):
+                    ii = i * resolution + di
+                    jj = j * resolution + dj
+                    dx = di / resolution
+                    dy = dj / resolution
+
+                    obs[4] = x + dx
+                    obs[5] = y + dy
+                    obs[6] = 0
+                    obs[7] = 0
+                    for a_idx, a in enumerate(actions):
+                        q_value = ac.safety(obs, a)
+                        q_table[ii, jj, a_idx] = q_value
 
     # draw heatmap
     plt.figure(figsize=(10, 8))
     for a_idx, a in enumerate(actions):
-        plt.subplot(2, 2, a_idx + 1)
+        plt.subplot(3, 3, a_idx + 1)
         sns.heatmap(
             q_table[:, :, a_idx],
             cmap="viridis",
@@ -106,7 +140,6 @@ def draw_q_heatmap(ac, maze, obs0):
             xticklabels=False,
             yticklabels=False,
             vmin=0.4,
-            vmax=0.55,
         )
         plt.title(f"Action: {a}")
     plt.tight_layout()
