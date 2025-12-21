@@ -138,6 +138,7 @@ def main(args):
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_21_21_LEFT_UP_RANDOM, touch_wall_distance=0.3)
+        expert_pol = RuleBasedExpert(FOUR_ROOMS_21_21_LEFT_UP_RANDOM, FOUR_ROOMS_21_21_REWARD)
     
     elif args.environment == "PointMaze_Complicated-v3":
         env = gym.make(
@@ -146,11 +147,26 @@ def main(args):
             reset_target=False,
             render_mode="human" if render else None,
             maze_map=COMPLICATED_MAZE,
-            max_episode_steps=1200,
+            max_episode_steps=1500,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, COMPLICATED_MAZE, touch_wall_distance=0.3)
+        expert_pol = RuleBasedExpert(COMPLICATED_MAZE, COMPLICATED_MAZE_REWARD)
+
+    elif args.environment == "PointMaze_4rooms-v3-angle-single-start":
+        env = gym.make(
+            "PointMaze_Medium-v3",
+            continuing_task=False,
+            reset_target=False,
+            render_mode="human" if render else None,
+            maze_map=FOUR_ROOMS_ANGLE_SINGLE_START,
+            max_episode_steps=1100,
+        )
+        env = FlattenObservation(env)
+        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
+        env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)
+        expert_pol = RuleBasedExpert(FOUR_ROOMS_ANGLE_SINGLE_START, FOUR_ROOMS_ANGLE_REWARD)
 
     elif args.environment == "PointMaze_4rooms-v3-angle":
         env = gym.make(
@@ -158,25 +174,14 @@ def main(args):
             continuing_task=False,
             reset_target=False,
             render_mode="human" if render else None,
-            maze_map=FOUR_ROOMS_ANGLE_SINGLE_START,
-            max_episode_steps=1000,
-        )
-        env = FlattenObservation(env)
-        env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
-        env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)
-
-    elif args.environment == "PointMaze_4rooms-v3-angle-random-start":
-        env = gym.make(
-            "PointMaze_Medium-v3",
-            continuing_task=False,
-            reset_target=False,
-            render_mode="human" if render else None,
             maze_map=FOUR_ROOMS_ANGLE,
-            max_episode_steps=1000,
+            max_episode_steps=1100,
         )
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE)
+        expert_pol = RuleBasedExpert(FOUR_ROOMS_ANGLE, FOUR_ROOMS_ANGLE_REWARD)
+        
 
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
@@ -185,11 +190,7 @@ def main(args):
 
     if args.rule_expert == 1:
         print("!!! Using rule base expert !!!")
-        expert_pol = RuleBasedExpert(COMPLICATED_MAZE, COMPLICATED_MAZE_REWARD)
-    else:
-        print("!!! Using SAC expert !!!")
-        expert_model = SAC.load(args.expert_policy_file, device=device)
-        expert_pol = SB3Expert(expert_model)
+        
 
     # ---- 建 recovery policy ----
     recovery_policy = None
