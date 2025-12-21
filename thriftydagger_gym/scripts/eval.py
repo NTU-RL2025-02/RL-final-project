@@ -140,6 +140,7 @@ def draw_q_heatmap(ac, maze, obs0):
             xticklabels=False,
             yticklabels=False,
             vmin=0.4,
+            vmax=0.7,
         )
         plt.title(f"Action: {a}")
     plt.tight_layout()
