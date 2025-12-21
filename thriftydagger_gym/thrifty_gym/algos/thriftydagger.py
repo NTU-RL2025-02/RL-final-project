@@ -35,7 +35,7 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-g    init_eps_H: float = 0.32
+    init_eps_H: float = 0.32
     # Q-risk 初始切回 robot 的 safety 門檻
     init_eps_R: float = 0.34
 
@@ -385,6 +385,7 @@ def retrain_policy(
     avg_loss_pi = sum(loss_pi_vals) / len(loss_pi_vals) if loss_pi_vals else None
     return ac, pi_optimizers, avg_loss_pi
 
+
 def retrain_qrisk_monte_carlo(
     ac: Any,
     ac_targ: Any,
@@ -404,8 +405,8 @@ def retrain_qrisk_monte_carlo(
     batch_size: int,
     qrisk_cfg: QRiskConfig,
     epoch_idx: int,
-    risk_probe: bool, 
-    epoch_data
+    risk_probe: bool,
+    epoch_data,
 ) -> Optional[float]:
     """
     若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
@@ -442,6 +443,7 @@ def retrain_qrisk_monte_carlo(
     avg_loss_q = sum(loss_q_vals) / len(loss_q_vals) if loss_q_vals else None
     return avg_loss_q
 
+
 def retrain_qrisk(
     ac: Any,
     ac_targ: Any,
@@ -461,7 +463,7 @@ def retrain_qrisk(
     batch_size: int,
     qrisk_cfg: QRiskConfig,
     epoch_idx: int,
-    risk_probe: bool, 
+    risk_probe: bool,
 ) -> Optional[float]:
     """
     若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
@@ -591,7 +593,7 @@ def thrifty(
     bc_checkpoint: Optional[str] = None,
     save_bc_checkpoint: Optional[str] = None,
     skip_bc_pretrain: bool = False,
-    risk_probe: bool = False
+    risk_probe: bool = False,
 ) -> None:
     """
     Main entrypoint for ThriftyDAgger.
@@ -1055,12 +1057,14 @@ def thrifty(
             }
             logging_data.append(episode_dict)
 
-            epoch_data.append({
-                "obs" : np.array(obs), 
-                "act" : np.array(act),
-                "rew" : np.array(rew), 
-                "done" : np.array(done)
-            })
+            epoch_data.append(
+                {
+                    "obs": np.array(obs),
+                    "act": np.array(act),
+                    "rew": np.array(rew),
+                    "done": np.array(done),
+                }
+            )
 
             pickle.dump(
                 logging_data,
@@ -1184,8 +1188,8 @@ def thrifty(
             batch_size,
             qrisk_cfg,
             epoch_idx,
-            risk_probe, 
-            epoch_data
+            risk_probe,
+            epoch_data,
         )
 
         # --------------------------------------------------
