@@ -7,7 +7,7 @@ from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
 
-from thrifty_gym.maze import FOUR_ROOMS_21_21, FOUR_ROOMS_ANGLE
+from thrifty_gym.maze import FOUR_ROOMS_21_21, FOUR_ROOMS_ANGLE, COMPLICATED_MAZE, COMPLICATED_MAZE_REWARD
 from gymnasium_robotics.envs.maze.maps import MEDIUM_MAZE
 
 
@@ -124,6 +124,8 @@ def plot(
         maze = FOUR_ROOMS_ANGLE
     elif maze_layout == "medium":
         maze = MEDIUM_MAZE
+    elif maze_layout == "complicated":
+        maze = COMPLICATED_MAZE
     else:
         raise ValueError("Unsupported maze layout: {}".format(maze_layout))
 
@@ -232,8 +234,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--maze-layout",
         type=str,
-        default="four_rooms",
-        help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms', 'four_rooms_angle'.",
+        default="complicated",
+        help="Maze layout to use for plotting. Choices: 'medium', 'four_rooms', 'four_rooms_angle', 'complicated'.",
     )
 
     parser.add_argument(

@@ -107,7 +107,7 @@ def flatten_goal_observation(
     Order: observation, achieved_goal, desired_goal, followed by any extras.
     """
     if isinstance(obs, dict):
-        ordered_keys: Sequence[str] = ("observation", "achieved_goal", "desired_goal")
+        ordered_keys: Sequence[str] = ("achieved_goal", "desired_goal", "observation")
         parts: List[np.ndarray] = []
 
         for key in ordered_keys:
