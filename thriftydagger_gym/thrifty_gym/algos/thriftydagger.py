@@ -35,9 +35,9 @@ class ThresholdConfig:
     # online estimates 數量大於這個值才更新門檻
     min_estimates_for_update: int = 25
     # Q-risk 初始切到 human 的 safety 門檻（折扣成功率）
-    init_eps_H: float = 0.32
+    init_eps_H: float = 0.48
     # Q-risk 初始切回 robot 的 safety 門檻
-    init_eps_R: float = 0.34
+    init_eps_R: float = 0.495
 
 
 @dataclass
@@ -387,62 +387,62 @@ def retrain_policy(
     return ac, pi_optimizers, avg_loss_pi
 
 
-def retrain_qrisk_monte_carlo(
-    ac: Any,
-    ac_targ: Any,
-    qbuffer: QReplayBuffer,
-    num_test_episodes: int,
-    expert_policy: Any,
-    recovery_policy: Any,
-    env: Any,
-    act_limit: float,
-    horizon: int,
-    robosuite: bool,
-    logger_kwargs: Dict[str, Any],
-    pi_lr: float,
-    bc_epochs: int,
-    grad_steps: int,
-    gamma: float,
-    batch_size: int,
-    qrisk_cfg: QRiskConfig,
-    epoch_idx: int,
-    risk_probe: bool,
-    epoch_data,
-) -> Optional[float]:
-    """
-    若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
-    否則回傳 None。
-    """
+# def retrain_qrisk_monte_carlo(
+#     ac: Any,
+#     ac_targ: Any,
+#     qbuffer: QReplayBuffer,
+#     num_test_episodes: int,
+#     expert_policy: Any,
+#     recovery_policy: Any,
+#     env: Any,
+#     act_limit: float,
+#     horizon: int,
+#     robosuite: bool,
+#     logger_kwargs: Dict[str, Any],
+#     pi_lr: float,
+#     bc_epochs: int,
+#     grad_steps: int,
+#     gamma: float,
+#     batch_size: int,
+#     qrisk_cfg: QRiskConfig,
+#     epoch_idx: int,
+#     risk_probe: bool,
+#     epoch_data,
+# ) -> Optional[float]:
+#     """
+#     若 q_learning=True，重新訓練 Q-risk safety critic，並回傳平均 LossQ。
+#     否則回傳 None。
+#     """
 
-    # 重新設定 Q-network optimizer
-    q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
-    q_optimizer = Adam(q_params, lr=pi_lr)
+#     # 重新設定 Q-network optimizer
+#     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
+#     q_optimizer = Adam(q_params, lr=pi_lr)
 
-    loss_q_vals: List[float] = []
-    q_batch_size = int(batch_size * qrisk_cfg.q_batch_scale)
+#     loss_q_vals: List[float] = []
+#     q_batch_size = int(batch_size * qrisk_cfg.q_batch_scale)
 
-    # for episode in epoch_data:
-    #     obs = torch.as_tensor(episode["obs"][:-1], dtype=torch.float32, device="cuda")
-    #     act = torch.as_tensor(episode["act"][:-1], dtype=torch.float32, device="cuda")
-    #     obs2 = torch.as_tensor(np.concatenate([episode["obs"][1:], [0]]), dtype=torch.float32, device="cuda")
-    #     rew = torch.as_tensor(episode["rew"][:-1], dtype=torch.float32, device="cuda")
-    #     done = torch.as_tensor(episode["done"][:-1], dtype=torch.float32, device="cuda")
+#     # for episode in epoch_data:
+#     #     obs = torch.as_tensor(episode["obs"][:-1], dtype=torch.float32, device="cuda")
+#     #     act = torch.as_tensor(episode["act"][:-1], dtype=torch.float32, device="cuda")
+#     #     obs2 = torch.as_tensor(np.concatenate([episode["obs"][1:], [0]]), dtype=torch.float32, device="cuda")
+#     #     rew = torch.as_tensor(episode["rew"][:-1], dtype=torch.float32, device="cuda")
+#     #     done = torch.as_tensor(episode["done"][:-1], dtype=torch.float32, device="cuda")
 
-    #     loss_q_vals.append(
-    #         update_q(ac, ac_targ, q_optimizer, [obs, act, obs2, rew, done], gamma, timer=0)
-    #     )
+#     #     loss_q_vals.append(
+#     #         update_q(ac, ac_targ, q_optimizer, [obs, act, obs2, rew, done], gamma, timer=0)
+#     #     )
 
-    for _ in range(bc_epochs):
-        for step_idx in range(grad_steps * qrisk_cfg.q_grad_multiplier):
-            batch = qbuffer.sample_batch(
-                q_batch_size, pos_fraction=qrisk_cfg.pos_fraction
-            )
-            loss_q_vals.append(
-                update_q(ac, ac_targ, q_optimizer, batch, gamma, timer=step_idx)
-            )
+#     for _ in range(bc_epochs):
+#         for step_idx in range(grad_steps * qrisk_cfg.q_grad_multiplier):
+#             batch = qbuffer.sample_batch(
+#                 q_batch_size, pos_fraction=qrisk_cfg.pos_fraction
+#             )
+#             loss_q_vals.append(
+#                 update_q(ac, ac_targ, q_optimizer, batch, gamma, timer=step_idx)
+#             )
 
-    avg_loss_q = sum(loss_q_vals) / len(loss_q_vals) if loss_q_vals else None
-    return avg_loss_q
+#     avg_loss_q = sum(loss_q_vals) / len(loss_q_vals) if loss_q_vals else None
+#     return avg_loss_q
 
 
 def retrain_qrisk(
@@ -1170,27 +1170,27 @@ def thrifty(
         except OSError:
             pass
 
-        avg_loss_q = retrain_qrisk_monte_carlo(
-            ac,
-            ac_targ,
-            qbuffer,
-            num_test_episodes,
-            expert_policy,
-            recovery_policy,
-            env,
-            act_limit,
-            horizon,
-            robosuite,
-            logger_kwargs,
-            pi_lr,
-            bc_epochs,
-            grad_steps,
-            gamma,
-            batch_size,
-            qrisk_cfg,
-            epoch_idx,
-            risk_probe,
-            epoch_data,
+        avg_loss_q = retrain_qrisk(
+            ac=ac,
+            ac_targ=ac_targ,
+            qbuffer=qbuffer,
+            num_test_episodes=num_test_episodes,
+            expert_policy=expert_policy,
+            recovery_policy=recovery_policy,
+            env=env,
+            act_limit=act_limit,
+            horizon=horizon,
+            robosuite=robosuite,
+            logger_kwargs=logger_kwargs,
+            pi_lr=pi_lr,
+            bc_epochs=bc_epochs,
+            grad_steps=grad_steps,
+            gamma=gamma,
+            batch_size=batch_size,
+            qrisk_cfg=qrisk_cfg,
+            epoch_idx=epoch_idx,
+            risk_probe=risk_probe,
+            epoch_data=epoch_data,
         )
 
         # --------------------------------------------------
