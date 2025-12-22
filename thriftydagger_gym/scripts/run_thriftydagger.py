@@ -7,13 +7,10 @@
 
 # standard libraries
 import numpy as np
-import sys
-import time
 import torch
 import wandb
-import h5py
 import os
-from pathlib import Path
+
 
 # thriftydagger
 from thrifty_gym.algos.thriftydagger import thrifty
@@ -42,10 +39,8 @@ import gymnasium_robotics
 from gymnasium_robotics.envs.maze.maps import U_MAZE
 from gymnasium.wrappers import FlattenObservation
 
-from stable_baselines3 import SAC
 
 os.environ["MUJOCO_GL"] = "egl"
-RULE_EXPERT_DIR = Path(__file__).resolve().parents[1] / "rule-based_expert"
 
 
 class SB3Expert:
