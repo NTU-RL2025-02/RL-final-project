@@ -165,6 +165,7 @@ def test_agent(
         done = False
 
         while not done:
+            # print(o)
             obs_list.append(o)
             ball_x, ball_y = o[0], o[1]
             ball_traj.append([ball_x, ball_y])  # 存入綠色球的軌跡
@@ -575,7 +576,7 @@ def thrifty(
     batch_size: int = 100,
     logger_kwargs: Dict[str, Any] = dict(),
     num_test_episodes: int = 10,
-    bc_epochs: int = 5,
+    bc_epochs: int = 20,
     input_file: str = "data.pkl",
     device_idx: int = 0,
     expert_policy: Optional[Any] = None,

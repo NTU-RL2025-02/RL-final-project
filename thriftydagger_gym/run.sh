@@ -2,23 +2,23 @@
 # Run ThriftyDagger experiment in tmux
 # Usage: ./run.sh
 
-ENVIRONMENT_NAME="PointMaze_4rooms-v3"
+ENVIRONMENT_NAME="PointMaze_4rooms-v3-angle"
 
 FALSE=0
 TRUE=1
 USE_RULE_BASE_EXPERT=$TRUE
 # if USE_RULE_BASE_EXPERT is false, then use following expert policy
 EXPERT_POLICY_PATH="models/experts/best_model_4rooms.zip"
-DEMONSTRATION_PATH="models/demonstrations/offline_data_100.pkl"
-USE_BC_CHECKPOINT=$FALSE
-BC_CHECKPOINT_PATH="models/bc_models/4room_rule_base_100_noise_0.pt"
+DEMONSTRATION_PATH="models/demonstrations/angle_100.pkl"
+USE_BC_CHECKPOINT=$TRUE
+BC_CHECKPOINT_PATH="models/bc_models/angle_rule_base_100_noise_0.pt"
 
-RECOVERY_TYPE="expert"
+RECOVERY_TYPE="q"
 NOISY_SCALE="0.0"
 MAX_EXPERT_QUERY="50000"
 TEST_EPISODE_AMOUNT="50"
 
-EXP_NAME="4rooms_expert"
+EXP_NAME="angle_q"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASENAME="${TIMESTAMP}_${EXP_NAME}"
 SESSION_NAME="pointmaze_$BASENAME"

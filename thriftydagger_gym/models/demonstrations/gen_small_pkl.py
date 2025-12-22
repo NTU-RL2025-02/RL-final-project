@@ -1,8 +1,8 @@
 import pickle, numpy as np
 
-src = "models/offline_dataset_rulebased_10000.pkl"  
-dst = "models/offline_dataset_rulebased_1000.pkl"  
-n = 1000
+src = "offline_data_100.pkl"  
+dst = "offline_data_50.pkl"  
+n = 50
 
 data = pickle.load(open(src, "rb"))
 num = len(data["obs"])
