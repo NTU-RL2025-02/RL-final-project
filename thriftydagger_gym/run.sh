@@ -38,7 +38,6 @@ if (( $USE_BC_CHECKPOINT )); then
     --device 0 \
     --iters 100 \
     --targetrate 0.01 \
-    --expert_policy_file $EXPERT_POLICY_PATH \
     --demonstration_set_file $DEMONSTRATION_PATH \
     --max_expert_query $MAX_EXPERT_QUERY \
     --environment $ENVIRONMENT_NAME \
@@ -61,7 +60,6 @@ else
     --device 0 \
     --iters 100 \
     --targetrate 0.01 \
-    --expert_policy_file $EXPERT_POLICY_PATH \
     --demonstration_set_file $DEMONSTRATION_PATH \
     --max_expert_query $MAX_EXPERT_QUERY \
     --environment $ENVIRONMENT_NAME \
