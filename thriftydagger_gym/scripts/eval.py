@@ -151,7 +151,7 @@ def draw_q_heatmap(ac, maze, obs0):
     plt.yticks([])
 
     # 箭頭太密會變成一坨：做下採樣
-    step = 2  # 你可以調大/調小（越大越稀疏）
+    step = 5  # 你可以調大/調小（越大越稀疏）
     ys = np.arange(1, q_max.shape[0], step)
     xs = np.arange(1, q_max.shape[1], step)
     XX, YY = np.meshgrid(xs, ys)
@@ -174,7 +174,7 @@ def draw_q_heatmap(ac, maze, obs0):
         VV,
         angles="xy",
         scale_units="xy",
-        scale=0.4,  # 越大箭頭越短；你可以調
+        scale=0.3,  # 越大箭頭越短；你可以調
         width=0.001,
         alpha=0.6,
     )
