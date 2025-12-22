@@ -270,7 +270,7 @@ if __name__ == "__main__":
         default=50000,
         help="maximum number of expert queries allowed",
     )
-    parser.add_argument("--environment", type=str, default="PointMaze_Medium-v3")
+    parser.add_argument("--environment", type=str, default="PointMaze_4rooms-v3")
     parser.add_argument(
         "--render",
         action="store_true",
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_test_episodes",
         type=int,
-        default=20,
+        default=50,
         help="number of test episodes to run after each iteration",
     )
     parser.add_argument(
