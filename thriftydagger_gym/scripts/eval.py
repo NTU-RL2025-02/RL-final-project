@@ -180,6 +180,7 @@ def draw_q_heatmap(ac, maze, obs0):
     )
 
     plt.tight_layout()
+    plt.savefig("q_heatmap.png", dpi=400)
     plt.show()
 
 
