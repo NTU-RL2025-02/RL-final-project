@@ -167,17 +167,17 @@ def draw_q_heatmap(ac, maze, obs0):
     UU[mask] = np.nan
     VV[mask] = np.nan
 
-    plt.quiver(
-        XX,
-        YY,
-        UU,
-        VV,
-        angles="xy",
-        scale_units="xy",
-        scale=0.3,  # 越大箭頭越短；你可以調
-        width=0.001,
-        alpha=0.6,
-    )
+    # plt.quiver(
+    #     XX,
+    #     YY,
+    #     UU,
+    #     VV,
+    #     angles="xy",
+    #     scale_units="xy",
+    #     scale=0.3,  # 越大箭頭越短；你可以調
+    #     width=0.001,
+    #     alpha=0.6,
+    # )
 
     plt.tight_layout()
     plt.savefig("q_heatmap.png", dpi=400)
