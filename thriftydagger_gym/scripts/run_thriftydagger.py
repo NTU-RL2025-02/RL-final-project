@@ -33,6 +33,7 @@ from thrifty_gym.maze import (
     FOUR_ROOMS_21_21_LEFT_UP_RANDOM,
     COMPLICATED_MAZE,
     COMPLICATED_MAZE_REWARD,
+    FOUR_ROOMS_ANGLE_REWARD,
 )
 from thrifty_gym.algos.rule_expert import RuleBasedExpert
 
@@ -139,8 +140,10 @@ def main(args):
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_21_21_LEFT_UP_RANDOM, touch_wall_distance=0.3)
-        expert_pol = RuleBasedExpert(FOUR_ROOMS_21_21_LEFT_UP_RANDOM, FOUR_ROOMS_21_21_REWARD)
-    
+        expert_pol = RuleBasedExpert(
+            FOUR_ROOMS_21_21_LEFT_UP_RANDOM, FOUR_ROOMS_21_21_REWARD
+        )
+
     elif args.environment == "PointMaze_Complicated-v3":
         env = gym.make(
             "PointMaze_Medium-v3",
@@ -167,7 +170,9 @@ def main(args):
         env = FlattenObservation(env)
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE_SINGLE_START)
-        expert_pol = RuleBasedExpert(FOUR_ROOMS_ANGLE_SINGLE_START, FOUR_ROOMS_ANGLE_REWARD)
+        expert_pol = RuleBasedExpert(
+            FOUR_ROOMS_ANGLE_SINGLE_START, FOUR_ROOMS_ANGLE_REWARD
+        )
 
     elif args.environment == "PointMaze_4rooms-v3-angle":
         env = gym.make(
@@ -182,7 +187,6 @@ def main(args):
         env = NoisyActionWrapper(env, noise_scale=args.noisy_scale)
         env = MazeWrapper(env, FOUR_ROOMS_ANGLE)
         expert_pol = RuleBasedExpert(FOUR_ROOMS_ANGLE, FOUR_ROOMS_ANGLE_REWARD)
-        
 
     else:
         raise NotImplementedError("This environment is not implemented in this script.")
@@ -191,7 +195,6 @@ def main(args):
 
     if args.rule_expert == 1:
         print("!!! Using rule base expert !!!")
-        
 
     # ---- 建 recovery policy ----
     recovery_policy = None
@@ -226,7 +229,7 @@ def main(args):
             save_bc_checkpoint=args.save_bc_checkpoint,
             skip_bc_pretrain=args.skip_bc_pretrain,
             fix_thresholds=args.fix_thresholds,
-            risk_probe=args.risk_probe
+            risk_probe=args.risk_probe,
         )
     except Exception:
         wandb.finish(exit_code=1)

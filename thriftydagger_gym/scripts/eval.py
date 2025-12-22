@@ -95,17 +95,19 @@ def draw_q_heatmap(ac, maze, obs0):
     width = len(maze[0])
     height = len(maze)
     resolution = 20
-    actions = [
-        (-1, 1),
-        (0, 1),
-        (1, 1),
-        (-1, 0),
-        (0, 0),
-        (1, 0),
-        (-1, -1),
-        (0, -1),
-        (1, -1),
-    ]
+    actions = []
+    slice = 32
+    for k in range(slice):
+        theta = 2 * np.pi * k / slice
+        actions.append((np.cos(theta), np.sin(theta)))
+    actions.append((0.0, 0.0))
+
+    # 對應到 quiver 的 (U,V)
+    # U 對應 x 方向（jj 增加往右）
+    # V 對應 y 方向（ii 增加往下，所以要反過來）
+    U = np.array([a[0] for a in actions], dtype=np.float32)
+    V = -np.array([a[1] for a in actions], dtype=np.float32)
+
     q_table = np.zeros((height * resolution, width * resolution, len(actions)))
 
     for i in trange(height):
@@ -129,20 +131,54 @@ def draw_q_heatmap(ac, maze, obs0):
                         q_value = ac.safety(obs, a)
                         q_table[ii, jj, a_idx] = q_value
 
-    # draw heatmap
-    plt.figure(figsize=(10, 8))
-    for a_idx, a in enumerate(actions):
-        plt.subplot(3, 3, a_idx + 1)
-        sns.heatmap(
-            q_table[:, :, a_idx],
-            cmap="viridis",
-            cbar_kws={"label": "Q-value"},
-            xticklabels=False,
-            yticklabels=False,
-            vmin=0.4,
-            vmax=0.7,
-        )
-        plt.title(f"Action: {a}")
+    # 合併：每格只留最大值 + 最佳 action index
+    q_max = q_table.max(axis=2)  # (H*res, W*res)
+    a_best = q_table.argmax(axis=2)  # (H*res, W*res)
+
+    plt.figure(figsize=(12, 10))
+
+    # 你原本用 seaborn heatmap 也行，但我建議用 imshow 更好疊 quiver
+    im = plt.imshow(
+        q_max,
+        origin="upper",
+        cmap="viridis",
+        vmin=0.3,
+        vmax=0.6,
+    )
+    plt.colorbar(im, label="max Q-value")
+    plt.title("Max Q-value heatmap + best action arrows")
+    plt.xticks([])
+    plt.yticks([])
+
+    # 箭頭太密會變成一坨：做下採樣
+    step = 2  # 你可以調大/調小（越大越稀疏）
+    ys = np.arange(1, q_max.shape[0], step)
+    xs = np.arange(1, q_max.shape[1], step)
+    XX, YY = np.meshgrid(xs, ys)
+
+    best_idx_sampled = a_best[YY, XX]  # (len(ys), len(xs))
+    UU = U[best_idx_sampled]
+    VV = V[best_idx_sampled]
+
+    # (0,0) action 不想畫箭頭：做 mask
+    mask = (UU == 0) & (VV == 0)
+    UU = UU.astype(np.float32)
+    VV = VV.astype(np.float32)
+    UU[mask] = np.nan
+    VV[mask] = np.nan
+
+    plt.quiver(
+        XX,
+        YY,
+        UU,
+        VV,
+        angles="xy",
+        scale_units="xy",
+        scale=0.4,  # 越大箭頭越短；你可以調
+        width=0.001,
+        alpha=0.6,
+    )
+
     plt.tight_layout()
     plt.show()
 
