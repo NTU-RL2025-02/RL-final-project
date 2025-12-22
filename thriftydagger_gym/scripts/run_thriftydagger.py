@@ -342,6 +342,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rule_expert",
         type=int,
+        default=1,
         help="Use rule-based PointMaze expert instead of loading a SB3 zip.",
     )
     parser.add_argument(
