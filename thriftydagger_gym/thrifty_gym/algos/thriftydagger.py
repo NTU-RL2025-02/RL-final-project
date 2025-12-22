@@ -1190,7 +1190,6 @@ def thrifty(
             qrisk_cfg=qrisk_cfg,
             epoch_idx=epoch_idx,
             risk_probe=risk_probe,
-            epoch_data=epoch_data,
         )
 
         # --------------------------------------------------
