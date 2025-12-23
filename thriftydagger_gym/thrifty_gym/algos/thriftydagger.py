@@ -474,6 +474,19 @@ def retrain_qrisk(
     # 重新設定 Q-network optimizer
     q_params = itertools.chain(ac.q1.parameters(), ac.q2.parameters())
     q_optimizer = Adam(q_params, lr=pi_lr)
+    # --- recovery Q optimizer (ensemble) ---
+    recovery_q_optimizer = None
+    if (
+        hasattr(recovery_policy, "q_networks")
+        and len(getattr(recovery_policy, "q_networks")) > 0
+    ):
+        recovery_q_params = itertools.chain(
+            *[q.parameters() for q in recovery_policy.q_networks]
+        )
+        recovery_q_optimizer = Adam(recovery_q_params, lr=pi_lr)
+        loss_recovery_q_vals: List[float] = []
+    else:
+        loss_recovery_q_vals = []
 
     loss_q_vals: List[float] = []
     q_batch_size = int(batch_size * qrisk_cfg.q_batch_scale)
@@ -486,8 +499,27 @@ def retrain_qrisk(
             loss_q_vals.append(
                 update_q(ac, ac_targ, q_optimizer, batch, gamma, timer=step_idx)
             )
+            # --- train recovery Q (same batch) ---
+            if recovery_q_optimizer is not None:
+                loss_recovery_q_vals.append(
+                    recovery_policy.update_q(
+                        ac=ac,
+                        q_optimizer=recovery_q_optimizer,
+                        data=batch,
+                        gamma=gamma,
+                        timer=step_idx,
+                    )
+                )
 
     avg_loss_q = sum(loss_q_vals) / len(loss_q_vals) if loss_q_vals else None
+    avg_loss_recovery_q = (
+        sum(loss_recovery_q_vals) / len(loss_recovery_q_vals)
+        if loss_recovery_q_vals
+        else None
+    )
+    if avg_loss_recovery_q is not None:
+        print("AvgLossRecoveryQ", avg_loss_recovery_q)
+
     return avg_loss_q
 
 

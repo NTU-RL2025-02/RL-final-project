@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from thrifty_gym.algos.core import MLPQFunction
+import copy
+import itertools
 
 
 class Recovery:
@@ -42,6 +44,7 @@ class Recovery:
         self.q_risk = q_risk
         self.variance_weight = variance_weight
         self.q_networks = []
+        self.q_targ_networks = []
 
         if observation_space is not None and action_space is not None and num_nets > 0:
             obs_dim = observation_space.shape[0]
@@ -50,6 +53,14 @@ class Recovery:
                 MLPQFunction(obs_dim, act_dim, hidden_sizes, activation).to(self.device)
                 for _ in range(num_nets)
             ]
+            # --- target Q-networks (for Bellman backup) ---
+            self.q_targ_networks = [
+                copy.deepcopy(q).to(self.device) for q in self.q_networks
+            ]
+            for q_targ in self.q_targ_networks:
+                q_targ.eval()
+                for p in q_targ.parameters():
+                    p.requires_grad_(False)
 
     def objective(self, obs, action):
         raise NotImplementedError
@@ -122,6 +133,73 @@ class Recovery:
         indicator = 1.0 if q_risk_value < self.eta else 0.0
         self.R_t = self.alpha * self.R_t + (1 - self.alpha) * indicator
         return self.R_t
+
+    def _ensure_q_targets(self) -> None:
+        """確保 q_targ_networks 存在且與 q_networks 對齊。"""
+        if (
+            not hasattr(self, "q_targ_networks")
+            or self.q_targ_networks is None
+            or len(self.q_targ_networks) != len(self.q_networks)
+        ):
+            self.q_targ_networks = [
+                copy.deepcopy(q).to(self.device) for q in self.q_networks
+            ]
+            for q_targ in self.q_targ_networks:
+                q_targ.eval()
+                for p in q_targ.parameters():
+                    p.requires_grad_(False)
+
+    def compute_loss_q(self, ac, data, gamma: float) -> torch.Tensor:
+        """
+        Recovery Q ensemble 的 MSE Bellman loss（沿用 thriftydagger 的做法）：
+          a2 = mean_{pi in ac.pis} pi(o2)
+          backup = r + gamma * (1-d) * min_i Q'_i(o2, a2)
+          loss = mean_i (Q_i(o,a) - backup)^2
+        """
+        self._ensure_q_targets()
+
+        o, a, o2, r, d = (
+            data["obs"],
+            data["act"],
+            data["obs2"],
+            data["rew"],
+            data["done"],
+        )
+
+        with torch.no_grad():
+            a2 = torch.mean(torch.stack([pi(o2) for pi in ac.pis]), dim=0)
+
+            q_targs = torch.stack([q_targ(o2, a2) for q_targ in self.q_targ_networks])
+            q_targ_min = torch.min(q_targs, dim=0).values
+
+            backup = r + gamma * (1 - d) * q_targ_min
+
+        q_vals = torch.stack([q(o, a) for q in self.q_networks])
+        loss = ((q_vals - backup) ** 2).mean()
+        return loss
+
+    def update_q(
+        self, ac, q_optimizer, data, gamma: float, timer: int, polyak: float = 0.995
+    ) -> float:
+        """
+        對 recovery 的 Q ensemble 做一次 gradient step + soft update target。
+        行為對齊 thriftydagger.update_q：timer%2==0 才做 polyak。
+        """
+        self._ensure_q_targets()
+
+        q_optimizer.zero_grad()
+        loss_q = self.compute_loss_q(ac, data, gamma)
+        loss_q.backward()
+        q_optimizer.step()
+
+        if timer % 2 == 0:
+            with torch.no_grad():
+                for q, q_targ in zip(self.q_networks, self.q_targ_networks):
+                    for p, p_targ in zip(q.parameters(), q_targ.parameters()):
+                        p_targ.data.mul_(polyak)
+                        p_targ.data.add_((1 - polyak) * p.data)
+
+        return float(loss_q.item())
 
 
 class QRecovery(Recovery):
